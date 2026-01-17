@@ -38,6 +38,16 @@ export const CameraView = ({
 
   const isAllComplete = completedCount >= dailyGoal;
 
+  // Auto-start camera on mount
+  useEffect(() => {
+    if (!isAllComplete) {
+      startCamera();
+    }
+    return () => {
+      stopCamera();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Start detection when camera is active
   useEffect(() => {
     if (state.isActive && !state.isLoading) {
@@ -316,16 +326,32 @@ export const CameraView = ({
           </>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-            {state.error ? (
+            {state.isLoading ? (
+              <>
+                <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                <p className="text-muted-foreground text-center px-8">
+                  Starting camera...
+                </p>
+              </>
+            ) : state.error ? (
               <>
                 <AlertCircle className="w-12 h-12 text-destructive" />
                 <p className="text-destructive text-center px-8">{state.error}</p>
+                <Button onClick={startCamera} variant="outline" className="mt-2">
+                  <Camera className="w-4 h-4 mr-2" />
+                  Try Again
+                </Button>
               </>
             ) : (
               <>
-                <Camera className="w-12 h-12 text-muted-foreground" />
-                <p className="text-muted-foreground text-center px-8">
-                  Enable camera to track your habit automatically
+                <motion.div
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                >
+                  <Camera className="w-16 h-16 text-primary" />
+                </motion.div>
+                <p className="text-foreground font-medium text-center px-8">
+                  Click to enable camera tracking
                 </p>
                 {hasLearnedPattern && (
                   <p className="text-primary text-sm flex items-center gap-1">
@@ -333,6 +359,10 @@ export const CameraView = ({
                     Your movement pattern is ready!
                   </p>
                 )}
+                <Button onClick={startCamera} className="mt-2 bg-gradient-to-r from-primary to-accent">
+                  <Camera className="w-4 h-4 mr-2" />
+                  Start Camera
+                </Button>
               </>
             )}
           </div>
