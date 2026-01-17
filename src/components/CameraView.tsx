@@ -40,12 +40,12 @@ export const CameraView = ({ habitDescription, onActionDetected, todayCompleted 
     if (recentMotion.length < 10) return;
 
     const avgMotion = recentMotion.reduce((a, b) => a + b, 0) / recentMotion.length;
-    const progress = Math.min(avgMotion / 50, 1) * 100;
+    const progress = Math.min(avgMotion / 15, 1) * 100;
     
     setDetectionProgress(progress);
 
-    // If sustained high motion detected
-    if (avgMotion > 30 && recentMotion.filter(m => m > 20).length > 15) {
+    // If sustained high motion detected (>10% of pixels changing consistently)
+    if (avgMotion > 10 && recentMotion.filter(m => m > 8).length > 15) {
       if (countdown === null) {
         setCountdown(3);
       }
@@ -126,7 +126,7 @@ export const CameraView = ({ habitDescription, onActionDetected, todayCompleted 
             />
             <canvas
               ref={canvasRef}
-              className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+              className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-50"
             />
             
             {/* Detection overlay */}
@@ -140,8 +140,18 @@ export const CameraView = ({ habitDescription, onActionDetected, todayCompleted 
               {/* Status badge */}
               <div className="absolute top-4 left-1/2 -translate-x-1/2">
                 <div className="px-4 py-2 rounded-full bg-background/80 backdrop-blur-sm text-sm font-medium flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${state.poseDetected ? 'bg-success' : 'bg-warning'}`} />
-                  {state.poseDetected ? 'Pose Detected' : 'Looking for you...'}
+                  <div className={`w-2 h-2 rounded-full ${state.motionLevel > 5 ? 'bg-success' : 'bg-warning'}`} />
+                  {state.motionLevel > 5 ? 'Motion Detected' : 'Waiting for movement...'}
+                </div>
+              </div>
+
+              {/* Motion level indicator */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-48">
+                <div className="h-2 bg-background/50 rounded-full overflow-hidden backdrop-blur-sm">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-primary via-accent to-secondary"
+                    animate={{ width: `${Math.min(state.motionLevel * 3, 100)}%` }}
+                  />
                 </div>
               </div>
 
@@ -222,7 +232,7 @@ export const CameraView = ({ habitDescription, onActionDetected, todayCompleted 
             />
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            Perform your habit for a few seconds to complete today's goal
+            Move around and perform your habit for a few seconds to complete today's goal
           </p>
         </div>
       )}
