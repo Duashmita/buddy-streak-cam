@@ -4,12 +4,16 @@ import { Flame, Trophy, Zap } from 'lucide-react';
 interface StreakDisplayProps {
   streak: number;
   longestStreak: number;
-  todayCompleted: boolean;
+  dailyGoal: number;
+  completedCount: number;
 }
 
-export const StreakDisplay = ({ streak, longestStreak, todayCompleted }: StreakDisplayProps) => {
+export const StreakDisplay = ({ streak, longestStreak, dailyGoal, completedCount }: StreakDisplayProps) => {
+  const isComplete = completedCount >= dailyGoal;
+  
   const getMessage = () => {
-    if (!todayCompleted) return "Complete today's habit to keep your streak!";
+    if (completedCount === 0) return "Complete your first rep today!";
+    if (!isComplete) return `${completedCount}/${dailyGoal} done - keep going!`;
     if (streak === 0) return "Start your journey today!";
     if (streak === 1) return "Great start! Day 1 complete!";
     if (streak < 7) return "Building momentum! Keep going!";
@@ -27,7 +31,10 @@ export const StreakDisplay = ({ streak, longestStreak, todayCompleted }: StreakD
   };
 
   const nextMilestone = getNextMilestone();
-  const progress = nextMilestone ? (streak / nextMilestone.days) * 100 : 100;
+  const milestoneProgress = nextMilestone ? (streak / nextMilestone.days) * 100 : 100;
+
+  // Calculate today's progress as percentage
+  const todayProgress = (completedCount / dailyGoal) * 100;
 
   return (
     <motion.div
@@ -58,24 +65,57 @@ export const StreakDisplay = ({ streak, longestStreak, todayCompleted }: StreakD
         
         <motion.div
           animate={{
-            scale: todayCompleted ? [1, 1.2, 1] : 1,
+            scale: isComplete ? [1, 1.2, 1] : 1,
           }}
           transition={{
             duration: 0.5,
-            repeat: todayCompleted ? 0 : Infinity,
+            repeat: isComplete ? 0 : Infinity,
             repeatDelay: 2,
           }}
           className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
-            todayCompleted
+            isComplete
               ? 'bg-gradient-to-br from-success/20 to-success/10'
               : 'bg-gradient-to-br from-primary/20 to-accent/10'
           }`}
         >
-          <Flame className={`w-8 h-8 ${todayCompleted ? 'text-success' : 'text-primary'}`} />
+          <Flame className={`w-8 h-8 ${isComplete ? 'text-success' : 'text-primary'}`} />
         </motion.div>
       </div>
 
       <p className="text-lg text-foreground mb-6">{getMessage()}</p>
+
+      {/* Today's progress */}
+      <div className="space-y-3 mb-6 p-4 rounded-2xl bg-muted/30">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-muted-foreground">Today's Progress</span>
+          <span className="text-xl font-display font-bold">
+            <span className={completedCount > 0 ? 'text-success' : 'text-foreground'}>
+              {completedCount}
+            </span>
+            <span className="text-muted-foreground">/{dailyGoal}</span>
+          </span>
+        </div>
+        <div className="flex gap-2">
+          {Array.from({ length: dailyGoal }).map((_, i) => (
+            <motion.div
+              key={i}
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: i * 0.1 }}
+              className={`flex-1 h-3 rounded-full ${
+                i < completedCount 
+                  ? 'bg-gradient-to-r from-success to-success/80' 
+                  : 'bg-muted'
+              }`}
+            />
+          ))}
+        </div>
+        {isComplete && (
+          <p className="text-sm text-success font-medium text-center">
+            🎉 Yay! All {dailyGoal} reps complete!
+          </p>
+        )}
+      </div>
 
       {/* Progress to next milestone */}
       {nextMilestone && (
@@ -90,7 +130,7 @@ export const StreakDisplay = ({ streak, longestStreak, todayCompleted }: StreakD
           <div className="h-3 bg-muted rounded-full overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${Math.min(progress, 100)}%` }}
+              animate={{ width: `${Math.min(milestoneProgress, 100)}%` }}
               transition={{ duration: 0.5, ease: 'easeOut' }}
               className="h-full bg-gradient-to-r from-primary via-accent to-secondary"
             />
@@ -109,9 +149,9 @@ export const StreakDisplay = ({ streak, longestStreak, todayCompleted }: StreakD
           <p className="text-xs text-muted-foreground">Longest Streak</p>
         </div>
         <div className="text-center p-4 rounded-2xl bg-muted/30">
-          <div className={`w-5 h-5 mx-auto mb-2 rounded-full ${todayCompleted ? 'bg-success' : 'bg-muted'}`} />
-          <p className="text-2xl font-display font-bold">{todayCompleted ? '✓' : '○'}</p>
-          <p className="text-xs text-muted-foreground">Today's Status</p>
+          <div className={`w-5 h-5 mx-auto mb-2 rounded-full ${isComplete ? 'bg-success' : 'bg-muted'}`} />
+          <p className="text-2xl font-display font-bold">{isComplete ? '✓' : `${completedCount}/${dailyGoal}`}</p>
+          <p className="text-xs text-muted-foreground">Today</p>
         </div>
       </div>
     </motion.div>

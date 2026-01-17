@@ -3,14 +3,15 @@ import { useState, useEffect, useCallback } from 'react';
 export interface HabitData {
   habitName: string;
   habitDescription: string;
-  habitIllustration: string;
+  dailyGoal: number;
+  referenceFrames: string[]; // Base64 encoded reference frames from calibration
   createdAt: string;
 }
 
 export interface DailyRecord {
   date: string;
-  completed: boolean;
-  completedAt?: string;
+  completedCount: number;
+  completions: string[]; // timestamps of each completion
 }
 
 export interface HabitState {
@@ -18,7 +19,7 @@ export interface HabitState {
   streak: number;
   longestStreak: number;
   dailyRecords: DailyRecord[];
-  todayCompleted: boolean;
+  todayCompletedCount: number;
   lastCompletedDate: string | null;
 }
 
@@ -32,7 +33,7 @@ export const useHabitStore = () => {
     streak: 0,
     longestStreak: 0,
     dailyRecords: [],
-    todayCompleted: false,
+    todayCompletedCount: 0,
     lastCompletedDate: null,
   });
 
@@ -46,7 +47,7 @@ export const useHabitStore = () => {
         const todayRecord = parsed.dailyRecords?.find((r: DailyRecord) => r.date === today);
         setState({
           ...parsed,
-          todayCompleted: todayRecord?.completed || false,
+          todayCompletedCount: todayRecord?.completedCount || 0,
         });
       } catch (e) {
         console.error('Failed to parse saved habit data:', e);
@@ -68,45 +69,80 @@ export const useHabitStore = () => {
       streak: 0,
       longestStreak: 0,
       dailyRecords: [],
-      todayCompleted: false,
+      todayCompletedCount: 0,
       lastCompletedDate: null,
     }));
   }, []);
 
-  const markTodayComplete = useCallback(() => {
+  const recordCompletion = useCallback(() => {
     const today = getTodayKey();
     
     setState(prev => {
-      if (prev.todayCompleted) return prev;
+      if (!prev.habit) return prev;
+      
+      const dailyGoal = prev.habit.dailyGoal;
+      const currentCount = prev.todayCompletedCount;
+      
+      // Already completed all for today
+      if (currentCount >= dailyGoal) return prev;
 
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayKey = yesterday.toISOString().split('T')[0];
+      const newCount = currentCount + 1;
+      const isGoalComplete = newCount >= dailyGoal;
 
-      // Calculate new streak
-      let newStreak = 1;
-      if (prev.lastCompletedDate === yesterdayKey) {
-        newStreak = prev.streak + 1;
+      // Find or create today's record
+      const existingRecord = prev.dailyRecords.find(r => r.date === today);
+      const newCompletion = new Date().toISOString();
+      
+      let updatedRecords: DailyRecord[];
+      if (existingRecord) {
+        updatedRecords = prev.dailyRecords.map(r => 
+          r.date === today 
+            ? { ...r, completedCount: newCount, completions: [...r.completions, newCompletion] }
+            : r
+        );
+      } else {
+        updatedRecords = [...prev.dailyRecords, {
+          date: today,
+          completedCount: newCount,
+          completions: [newCompletion],
+        }];
       }
 
-      const newLongest = Math.max(prev.longestStreak, newStreak);
+      // Calculate streak only when daily goal is complete
+      let newStreak = prev.streak;
+      let newLongest = prev.longestStreak;
+      let newLastDate = prev.lastCompletedDate;
 
-      const newRecord: DailyRecord = {
-        date: today,
-        completed: true,
-        completedAt: new Date().toISOString(),
-      };
+      if (isGoalComplete) {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayKey = yesterday.toISOString().split('T')[0];
+
+        if (prev.lastCompletedDate === yesterdayKey) {
+          newStreak = prev.streak + 1;
+        } else if (prev.lastCompletedDate !== today) {
+          newStreak = 1;
+        }
+
+        newLongest = Math.max(prev.longestStreak, newStreak);
+        newLastDate = today;
+      }
 
       return {
         ...prev,
         streak: newStreak,
         longestStreak: newLongest,
-        dailyRecords: [...prev.dailyRecords.filter(r => r.date !== today), newRecord],
-        todayCompleted: true,
-        lastCompletedDate: today,
+        dailyRecords: updatedRecords,
+        todayCompletedCount: newCount,
+        lastCompletedDate: newLastDate,
       };
     });
   }, []);
+
+  const isTodayComplete = useCallback(() => {
+    if (!state.habit) return false;
+    return state.todayCompletedCount >= state.habit.dailyGoal;
+  }, [state.habit, state.todayCompletedCount]);
 
   const resetHabit = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
@@ -115,7 +151,7 @@ export const useHabitStore = () => {
       streak: 0,
       longestStreak: 0,
       dailyRecords: [],
-      todayCompleted: false,
+      todayCompletedCount: 0,
       lastCompletedDate: null,
     });
   }, []);
@@ -136,7 +172,8 @@ export const useHabitStore = () => {
   return {
     ...state,
     setHabit,
-    markTodayComplete,
+    recordCompletion,
+    isTodayComplete,
     resetHabit,
     getTimeRemaining,
   };

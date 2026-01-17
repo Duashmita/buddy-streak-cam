@@ -14,28 +14,37 @@ const Index = () => {
     habit,
     streak,
     longestStreak,
-    todayCompleted,
+    todayCompletedCount,
     setHabit,
-    markTodayComplete,
+    recordCompletion,
+    isTodayComplete,
     resetHabit,
   } = useHabitStore();
 
   const handleActionDetected = () => {
-    markTodayComplete();
+    const wasComplete = isTodayComplete();
+    recordCompletion();
     
-    // Trigger confetti celebration
+    // Trigger confetti for each rep
     confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
+      particleCount: 50,
+      spread: 60,
+      origin: { y: 0.7 },
       colors: ['#a855f7', '#ec4899', '#00d4aa'],
     });
-  };
 
-  // Check for streak break on load
-  useEffect(() => {
-    // Future: could add logic to check if streak should reset
-  }, []);
+    // Extra confetti when completing all reps
+    if (!wasComplete && habit && todayCompletedCount + 1 >= habit.dailyGoal) {
+      setTimeout(() => {
+        confetti({
+          particleCount: 150,
+          spread: 100,
+          origin: { y: 0.5 },
+          colors: ['#a855f7', '#ec4899', '#00d4aa', '#fbbf24'],
+        });
+      }, 300);
+    }
+  };
 
   if (!habit) {
     return (
@@ -65,7 +74,10 @@ const Index = () => {
         <HabitHeader habitName={habit.habitName} onReset={resetHabit} />
 
         {/* Countdown Timer */}
-        <CountdownTimer todayCompleted={todayCompleted} />
+        <CountdownTimer 
+          dailyGoal={habit.dailyGoal} 
+          completedCount={todayCompletedCount} 
+        />
 
         {/* Main grid */}
         <div className="grid lg:grid-cols-2 gap-6">
@@ -73,14 +85,17 @@ const Index = () => {
           <StreakDisplay
             streak={streak}
             longestStreak={longestStreak}
-            todayCompleted={todayCompleted}
+            dailyGoal={habit.dailyGoal}
+            completedCount={todayCompletedCount}
           />
 
           {/* Right column - Camera */}
           <CameraView
-            habitDescription={habit.habitDescription}
+            habitDescription={habit.habitDescription || habit.habitName}
+            referenceFrames={habit.referenceFrames}
+            dailyGoal={habit.dailyGoal}
+            completedCount={todayCompletedCount}
             onActionDetected={handleActionDetected}
-            todayCompleted={todayCompleted}
           />
         </div>
 
@@ -94,7 +109,7 @@ const Index = () => {
         </motion.section>
 
         {/* Manual check-in button (fallback) */}
-        {!todayCompleted && (
+        {!isTodayComplete() && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -105,14 +120,14 @@ const Index = () => {
               onClick={handleActionDetected}
               className="px-6 py-3 rounded-2xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors text-sm"
             >
-              Camera not working? Click here for manual check-in
+              Camera not working? Click for manual check-in ({todayCompletedCount + 1}/{habit.dailyGoal})
             </button>
           </motion.div>
         )}
 
         {/* Footer */}
         <footer className="text-center text-sm text-muted-foreground pt-8 pb-4">
-          <p>Built with AI-powered pose detection • Keep showing up! 🔥</p>
+          <p>Built with AI-powered motion detection • Keep showing up! 🔥</p>
         </footer>
       </div>
     </div>

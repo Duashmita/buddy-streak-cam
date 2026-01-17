@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, AlertTriangle } from 'lucide-react';
+import { Clock, AlertTriangle, PartyPopper } from 'lucide-react';
 
 interface CountdownTimerProps {
-  todayCompleted: boolean;
+  dailyGoal: number;
+  completedCount: number;
 }
 
-export const CountdownTimer = ({ todayCompleted }: CountdownTimerProps) => {
+export const CountdownTimer = ({ dailyGoal, completedCount }: CountdownTimerProps) => {
   const [timeRemaining, setTimeRemaining] = useState({
     hours: 0,
     minutes: 0,
     seconds: 0,
   });
+
+  const isComplete = completedCount >= dailyGoal;
 
   useEffect(() => {
     const updateTimer = () => {
@@ -37,10 +40,10 @@ export const CountdownTimer = ({ todayCompleted }: CountdownTimerProps) => {
     return () => clearInterval(interval);
   }, []);
 
-  const isUrgent = timeRemaining.hours < 2 && !todayCompleted;
+  const isUrgent = timeRemaining.hours < 2 && !isComplete;
   const formatNumber = (n: number) => String(n).padStart(2, '0');
 
-  if (todayCompleted) {
+  if (isComplete) {
     return (
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -48,11 +51,13 @@ export const CountdownTimer = ({ todayCompleted }: CountdownTimerProps) => {
         className="glass-card rounded-2xl p-6 text-center border border-success/30 bg-success/5"
       >
         <div className="flex items-center justify-center gap-3 mb-2">
-          <div className="w-3 h-3 rounded-full bg-success animate-pulse" />
-          <span className="text-success font-semibold">Today's Goal Complete!</span>
+          <PartyPopper className="w-5 h-5 text-success" />
+          <span className="text-success font-semibold">
+            {completedCount}/{dailyGoal} Reps Complete! 🎉
+          </span>
         </div>
         <p className="text-sm text-muted-foreground">
-          Come back tomorrow to continue your streak
+          Amazing work! Come back tomorrow to continue your streak
         </p>
       </motion.div>
     );
@@ -73,7 +78,7 @@ export const CountdownTimer = ({ todayCompleted }: CountdownTimerProps) => {
           <Clock className="w-5 h-5 text-muted-foreground" />
         )}
         <span className={`font-medium ${isUrgent ? 'text-destructive' : 'text-muted-foreground'}`}>
-          Time Remaining Today
+          Time Remaining • {completedCount}/{dailyGoal} reps done
         </span>
       </div>
 
@@ -108,8 +113,8 @@ export const CountdownTimer = ({ todayCompleted }: CountdownTimerProps) => {
 
       <p className="text-sm text-muted-foreground mt-3">
         {isUrgent
-          ? "Don't break your streak! Complete your habit now!"
-          : 'Complete your habit before midnight to save your streak'}
+          ? `Complete ${dailyGoal - completedCount} more rep${dailyGoal - completedCount > 1 ? 's' : ''} to save your streak!`
+          : `Complete all ${dailyGoal} reps before midnight`}
       </p>
     </motion.div>
   );
