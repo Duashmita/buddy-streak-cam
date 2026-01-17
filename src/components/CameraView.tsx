@@ -27,7 +27,7 @@ export const CameraView = ({
     startCamera,
     stopCamera,
     startDetection,
-  } = useCameraDetection(referenceFrames);
+  } = useCameraDetection(referenceFrames || []);
 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [justCompleted, setJustCompleted] = useState(false);
@@ -59,7 +59,7 @@ export const CameraView = ({
 
     // Trigger when enough motion is detected with good matching
     const hasEnoughMotion = avgMotion > 8;
-    const hasGoodMatch = state.matchScore > 30 || referenceFrames.length === 0;
+    const hasGoodMatch = state.matchScore > 30 || !referenceFrames || referenceFrames.length === 0;
     const sustainedActivity = recentMotion.filter(m => m > 6).length > 12;
 
     if (hasEnoughMotion && hasGoodMatch && sustainedActivity) {
@@ -69,7 +69,7 @@ export const CameraView = ({
     } else {
       setCountdown(null);
     }
-  }, [motionHistory, state.matchScore, isAllComplete, justCompleted, countdown, referenceFrames.length]);
+  }, [motionHistory, state.matchScore, isAllComplete, justCompleted, countdown, referenceFrames]);
 
   // Countdown timer
   useEffect(() => {
