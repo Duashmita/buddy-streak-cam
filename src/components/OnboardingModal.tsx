@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, ArrowRight, Zap, Camera, Target, Video, Check, RotateCcw, Play, Square, Clock } from 'lucide-react';
+import { Sparkles, ArrowRight, Zap, Camera, Target, Video, Check, RotateCcw, Play, Square, Clock, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,6 +31,12 @@ const steps = [
     description: 'Set your daily goal for this habit',
   },
   {
+    id: 'duration',
+    icon: Timer,
+    title: 'How long is each rep?',
+    description: 'Set how long you want to perform each movement',
+  },
+  {
     id: 'deadline',
     icon: Clock,
     title: 'Set your daily deadline',
@@ -49,6 +55,7 @@ export const OnboardingModal = ({ isOpen, onComplete }: OnboardingModalProps) =>
   const [habitName, setHabitName] = useState('');
   const [habitDescription, setHabitDescription] = useState('');
   const [dailyGoal, setDailyGoal] = useState(1);
+  const [movementDuration, setMovementDuration] = useState(30); // seconds
   const [deadlineTime, setDeadlineTime] = useState('23:59');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingProgress, setRecordingProgress] = useState(0);
@@ -61,9 +68,9 @@ export const OnboardingModal = ({ isOpen, onComplete }: OnboardingModalProps) =>
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Start camera when on calibration step (now step 4)
+  // Start camera when on calibration step (now step 5)
   useEffect(() => {
-    if (currentStep === 4 && isOpen) {
+    if (currentStep === 5 && isOpen) {
       startCamera();
     } else {
       stopCamera();
@@ -160,6 +167,7 @@ export const OnboardingModal = ({ isOpen, onComplete }: OnboardingModalProps) =>
         habitName,
         habitDescription: habitDescription || habitName,
         dailyGoal,
+        movementDuration,
         deadlineTime,
         referenceFrames: recordedFrames,
         createdAt: new Date().toISOString(),
@@ -171,8 +179,9 @@ export const OnboardingModal = ({ isOpen, onComplete }: OnboardingModalProps) =>
     if (currentStep === 0) return true;
     if (currentStep === 1) return habitName.trim().length > 0;
     if (currentStep === 2) return dailyGoal >= 1 && dailyGoal <= 10;
-    if (currentStep === 3) return deadlineTime.length > 0;
-    if (currentStep === 4) return recordedFrames.length >= 30;
+    if (currentStep === 3) return movementDuration >= 5;
+    if (currentStep === 4) return deadlineTime.length > 0;
+    if (currentStep === 5) return recordedFrames.length >= 30;
     return true;
   };
 
@@ -339,8 +348,69 @@ export const OnboardingModal = ({ isOpen, onComplete }: OnboardingModalProps) =>
                   </div>
                 )}
 
-                {/* Step 3: Deadline */}
+                {/* Step 3: Movement Duration */}
                 {currentStep === 3 && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-center gap-4">
+                      <button
+                        onClick={() => setMovementDuration(Math.max(5, movementDuration - (movementDuration > 60 ? 30 : 5)))}
+                        className="w-14 h-14 rounded-full bg-muted hover:bg-muted/80 text-2xl font-bold transition-colors"
+                      >
+                        −
+                      </button>
+                      <div className="text-center min-w-32">
+                        <span className="text-5xl font-display font-bold gradient-text">
+                          {movementDuration >= 60 
+                            ? `${Math.floor(movementDuration / 60)}:${String(movementDuration % 60).padStart(2, '0')}`
+                            : movementDuration
+                          }
+                        </span>
+                        <p className="text-muted-foreground mt-1">
+                          {movementDuration >= 60 ? 'minutes' : 'seconds'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setMovementDuration(Math.min(3600, movementDuration + (movementDuration >= 60 ? 30 : 5)))}
+                        className="w-14 h-14 rounded-full bg-muted hover:bg-muted/80 text-2xl font-bold transition-colors"
+                      >
+                        +
+                      </button>
+                    </div>
+                    
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {[
+                        { label: '10 sec', value: 10 },
+                        { label: '30 sec', value: 30 },
+                        { label: '1 min', value: 60 },
+                        { label: '2 min', value: 120 },
+                        { label: '5 min', value: 300 },
+                        { label: '10 min', value: 600 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.value}
+                          onClick={() => setMovementDuration(preset.value)}
+                          className={`px-4 py-2 text-sm rounded-full transition-colors ${
+                            movementDuration === preset.value
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2 p-4 rounded-xl bg-accent/10 border border-accent/20">
+                      <Timer className="w-5 h-5 text-accent shrink-0" />
+                      <p className="text-sm text-muted-foreground">
+                        Each rep will count down for this duration while you perform the movement
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4: Deadline */}
+                {currentStep === 4 && (
                   <div className="space-y-6">
                     <div className="flex flex-col items-center gap-4">
                       <div className="relative">
@@ -387,8 +457,8 @@ export const OnboardingModal = ({ isOpen, onComplete }: OnboardingModalProps) =>
                   </div>
                 )}
 
-                {/* Step 4: Calibration */}
-                {currentStep === 4 && (
+                {/* Step 5: Calibration */}
+                {currentStep === 5 && (
                   <div className="space-y-4">
                     {/* Camera preview */}
                     <div className="relative aspect-video bg-muted/30 rounded-2xl overflow-hidden">
@@ -501,8 +571,8 @@ export const OnboardingModal = ({ isOpen, onComplete }: OnboardingModalProps) =>
               </motion.div>
             </AnimatePresence>
 
-            {/* Actions */}
-            {currentStep !== 3 && (
+            {/* Actions - hide only on calibration step (step 5) */}
+            {currentStep !== 5 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}

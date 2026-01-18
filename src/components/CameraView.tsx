@@ -9,6 +9,7 @@ interface CameraViewProps {
   referenceFrames: string[];
   dailyGoal: number;
   completedCount: number;
+  movementDuration?: number; // Duration in seconds for each rep
   onActionDetected: () => void;
 }
 
@@ -17,6 +18,7 @@ export const CameraView = ({
   referenceFrames,
   dailyGoal,
   completedCount,
+  movementDuration = 30,
   onActionDetected,
 }: CameraViewProps) => {
   const safeReferenceFrames = useMemo(() => referenceFrames || [], [referenceFrames]);
@@ -33,6 +35,7 @@ export const CameraView = ({
   } = useCameraDetection(safeReferenceFrames);
 
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [repTimer, setRepTimer] = useState<number | null>(null); // Timer for movement duration
   const [justCompleted, setJustCompleted] = useState(false);
   const [matchStreak, setMatchStreak] = useState(0);
 
@@ -71,7 +74,7 @@ export const CameraView = ({
     }
   }, [state.patternMatch, state.matchScore, state.motionLevel]);
 
-  // Monitor for sustained matching to trigger completion
+  // Monitor for sustained matching to start rep timer
   useEffect(() => {
     if (isAllComplete || justCompleted) return;
 
@@ -79,17 +82,37 @@ export const CameraView = ({
     const readyToTrigger = matchStreak > 12 && state.matchScore > 50;
 
     if (readyToTrigger) {
-      if (countdown === null) setCountdown(3);
+      // Start the rep timer if not already running
+      if (repTimer === null && countdown === null) {
+        setRepTimer(movementDuration);
+      }
       return;
     }
 
-    // Only cancel an in-progress countdown if we *really* fell out of the match zone
-    if (countdown !== null && matchStreak < 2) {
-      setCountdown(null);
+    // Only cancel an in-progress timer if we *really* fell out of the match zone
+    if (repTimer !== null && matchStreak < 2) {
+      setRepTimer(null);
     }
-  }, [matchStreak, state.matchScore, isAllComplete, justCompleted, countdown]);
+  }, [matchStreak, state.matchScore, isAllComplete, justCompleted, repTimer, countdown, movementDuration]);
 
-  // Countdown timer
+  // Rep timer countdown
+  useEffect(() => {
+    if (repTimer === null) return;
+    if (repTimer === 0) {
+      // Rep timer finished, start 3-2-1 countdown
+      setCountdown(3);
+      setRepTimer(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setRepTimer(repTimer - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [repTimer]);
+
+  // Final 3-2-1 countdown before completion
   useEffect(() => {
     if (countdown === null) return;
     if (countdown === 0) {
@@ -261,15 +284,51 @@ export const CameraView = ({
                 </div>
               </div>
 
-              {/* Countdown overlay */}
+              {/* Rep timer overlay */}
+              <AnimatePresence>
+                {repTimer !== null && countdown === null && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 flex flex-col items-center justify-center bg-primary/20 backdrop-blur-sm"
+                  >
+                    <p className="text-lg font-medium text-foreground mb-2">Keep going!</p>
+                    <motion.div
+                      key={repTimer}
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="text-7xl font-display font-bold text-primary"
+                    >
+                      {repTimer >= 60 
+                        ? `${Math.floor(repTimer / 60)}:${String(repTimer % 60).padStart(2, '0')}`
+                        : repTimer
+                      }
+                    </motion.div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {repTimer >= 60 ? 'minutes remaining' : 'seconds remaining'}
+                    </p>
+                    {/* Progress ring */}
+                    <div className="mt-4 w-32 h-2 bg-muted/50 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-gradient-to-r from-primary to-accent"
+                        animate={{ width: `${((movementDuration - repTimer) / movementDuration) * 100}%` }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Final 3-2-1 countdown overlay */}
               <AnimatePresence>
                 {countdown !== null && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8 }}
-                    className="absolute inset-0 flex items-center justify-center bg-success/30 backdrop-blur-sm"
+                    className="absolute inset-0 flex flex-col items-center justify-center bg-success/30 backdrop-blur-sm"
                   >
+                    <p className="text-lg font-medium text-success mb-2">Almost there!</p>
                     <motion.div
                       key={countdown}
                       initial={{ scale: 0.5, opacity: 0 }}

@@ -96,6 +96,7 @@ const Index = () => {
             referenceFrames={habit.referenceFrames}
             dailyGoal={habit.dailyGoal}
             completedCount={todayCompletedCount}
+            movementDuration={habit.movementDuration}
             onActionDetected={handleActionDetected}
           />
         </div>
