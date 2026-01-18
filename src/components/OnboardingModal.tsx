@@ -154,14 +154,20 @@ export const OnboardingModal = ({ isOpen, onComplete }: OnboardingModalProps) =>
   };
 
   const resetRecording = async () => {
+    // Clear recorded data
     setRecordedFrames([]);
     setRecordingProgress(0);
     setPreviewFrame(null);
     
-    // Restart the camera after reset
-    if (!streamRef.current) {
-      await startCamera();
+    // Stop the current camera stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
+    setCameraReady(false);
+    
+    // Restart the camera fresh
+    await startCamera();
   };
 
   const handleNext = () => {
