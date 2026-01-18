@@ -24,6 +24,7 @@ export const useCameraDetection = (referenceFrames?: string[]) => {
   const animationRef = useRef<number | null>(null);
   const prevFrameRef = useRef<ImageData | null>(null);
   const learnedPatternRef = useRef<MotionPattern | null>(null);
+  const mountedRef = useRef(true);
   
   const [state, setState] = useState<DetectionState>({
     isActive: false,
@@ -102,6 +103,8 @@ export const useCameraDetection = (referenceFrames?: string[]) => {
   };
 
   const startCamera = useCallback(async () => {
+    if (!mountedRef.current) return false;
+    
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
@@ -114,11 +117,24 @@ export const useCameraDetection = (referenceFrames?: string[]) => {
         audio: false,
       });
 
+      // Check if unmounted while waiting for camera
+      if (!mountedRef.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return false;
+      }
+
       streamRef.current = stream;
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
+      }
+
+      // Check again after play
+      if (!mountedRef.current) {
+        stream.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+        return false;
       }
 
       setState(prev => ({
@@ -130,11 +146,13 @@ export const useCameraDetection = (referenceFrames?: string[]) => {
       return true;
     } catch (error: any) {
       console.error('Failed to start camera:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error.message || 'Failed to access camera',
-      }));
+      if (mountedRef.current) {
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: error.message || 'Failed to access camera',
+        }));
+      }
       return false;
     }
   }, []);
@@ -296,7 +314,10 @@ export const useCameraDetection = (referenceFrames?: string[]) => {
 
   // Cleanup on unmount only - no dependencies to prevent re-running
   useEffect(() => {
+    mountedRef.current = true;
+    
     return () => {
+      mountedRef.current = false;
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;

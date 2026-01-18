@@ -44,7 +44,13 @@ export const CameraView = ({
     
     const initCamera = async () => {
       if (!isAllComplete && mounted) {
-        await startCamera();
+        const success = await startCamera();
+        // Start detection immediately after camera starts
+        if (success && mounted) {
+          setTimeout(() => {
+            startDetection();
+          }, 200);
+        }
       }
     };
     
@@ -52,19 +58,9 @@ export const CameraView = ({
     
     return () => {
       mounted = false;
+      stopCamera();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Start detection when camera is active
-  useEffect(() => {
-    if (state.isActive && !state.isLoading) {
-      // Small delay to ensure video is ready
-      const timer = setTimeout(() => {
-        startDetection();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [state.isActive, state.isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track consecutive pattern matches
   useEffect(() => {
