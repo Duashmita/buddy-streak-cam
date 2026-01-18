@@ -109,12 +109,26 @@ export const useHabitStore = () => {
 
     loadState();
 
-    // Check for day change every minute
-    const interval = setInterval(() => {
+    // Check for day change every minute (foreground)
+    const interval = window.setInterval(() => {
       loadState();
     }, 60000);
 
-    return () => clearInterval(interval);
+    // Also refresh when the tab becomes active again (background timers can be throttled)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadState();
+      }
+    };
+
+    window.addEventListener('focus', loadState);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', loadState);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // Save to localStorage when state changes

@@ -125,13 +125,27 @@ export const CameraView = ({
     setMatchStreak(0);
     setRepTimer(null);
     onActionDetected();
+  }, [repTimer, onActionDetected]);
+
+  // Auto-hide the "Rep Complete" overlay (kept separate so it won't be cancelled
+  // by repTimer state changes).
+  useEffect(() => {
+    if (!justCompleted) return;
 
     const t = window.setTimeout(() => {
       setJustCompleted(false);
     }, 2000);
 
     return () => window.clearTimeout(t);
-  }, [repTimer, onActionDetected]);
+  }, [justCompleted]);
+
+  // Safety: if the day resets and completedCount returns to 0, clear any leftover UI state.
+  useEffect(() => {
+    if (completedCount !== 0) return;
+    setJustCompleted(false);
+    setRepTimer(null);
+    setMatchStreak(0);
+  }, [completedCount]);
 
   const handleToggleCamera = async () => {
     if (state.isActive) {
