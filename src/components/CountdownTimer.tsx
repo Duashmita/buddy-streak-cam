@@ -1,19 +1,27 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Clock, AlertTriangle, PartyPopper } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Clock, AlertTriangle, PartyPopper, XCircle } from 'lucide-react';
 
 interface CountdownTimerProps {
   dailyGoal: number;
   completedCount: number;
   deadlineTime?: string; // HH:MM format
+  onDeadlineExpired?: () => void;
 }
 
-export const CountdownTimer = ({ dailyGoal, completedCount, deadlineTime = '23:59' }: CountdownTimerProps) => {
+export const CountdownTimer = ({ 
+  dailyGoal, 
+  completedCount, 
+  deadlineTime = '23:59',
+  onDeadlineExpired,
+}: CountdownTimerProps) => {
   const [timeRemaining, setTimeRemaining] = useState({
     hours: 0,
     minutes: 0,
     seconds: 0,
   });
+  const [hasExpired, setHasExpired] = useState(false);
+  const [showExpiredAnimation, setShowExpiredAnimation] = useState(false);
 
   const isComplete = completedCount >= dailyGoal;
 
@@ -25,11 +33,23 @@ export const CountdownTimer = ({ dailyGoal, completedCount, deadlineTime = '23:5
       const deadline = new Date();
       deadline.setHours(deadlineHours, deadlineMinutes, 0, 0);
       
-      // If deadline has passed for today, show zeros
       let diff = deadline.getTime() - now.getTime();
       
+      // If deadline has passed
       if (diff <= 0) {
         setTimeRemaining({ hours: 0, minutes: 0, seconds: 0 });
+        
+        // Only trigger expiry once, and only if not complete
+        if (!hasExpired && !isComplete) {
+          setHasExpired(true);
+          setShowExpiredAnimation(true);
+          onDeadlineExpired?.();
+          
+          // Hide animation after 5 seconds
+          setTimeout(() => {
+            setShowExpiredAnimation(false);
+          }, 5000);
+        }
         return;
       }
 
@@ -43,10 +63,90 @@ export const CountdownTimer = ({ dailyGoal, completedCount, deadlineTime = '23:5
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [deadlineTime]);
+  }, [deadlineTime, hasExpired, isComplete, onDeadlineExpired]);
 
-  const isUrgent = timeRemaining.hours < 2 && !isComplete;
+  // Reset expired state at midnight (new day)
+  useEffect(() => {
+    const checkNewDay = () => {
+      const now = new Date();
+      if (now.getHours() === 0 && now.getMinutes() === 0) {
+        setHasExpired(false);
+        setShowExpiredAnimation(false);
+      }
+    };
+    
+    const interval = setInterval(checkNewDay, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const isUrgent = timeRemaining.hours < 2 && !isComplete && !hasExpired;
   const formatNumber = (n: number) => String(n).padStart(2, '0');
+
+  // Show expired animation
+  if (showExpiredAnimation && !isComplete) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="glass-card rounded-2xl p-8 text-center border border-destructive/50 bg-destructive/10"
+      >
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: [0, 1.2, 1] }}
+          transition={{ duration: 0.5 }}
+          className="w-20 h-20 mx-auto mb-4 rounded-full bg-destructive/20 flex items-center justify-center"
+        >
+          <XCircle className="w-12 h-12 text-destructive" />
+        </motion.div>
+        <motion.h3
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-2xl font-display font-bold text-destructive mb-2"
+        >
+          Time's Up! ⏰
+        </motion.h3>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="text-muted-foreground"
+        >
+          You completed {completedCount}/{dailyGoal} reps.
+          {completedCount === 0 ? ' Your streak has been reset.' : ' Keep trying tomorrow!'}
+        </motion.p>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7 }}
+          className="mt-4 text-sm text-destructive/70"
+        >
+          The timer will reset at midnight
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  // Show expired state (after animation)
+  if (hasExpired && !isComplete) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-card rounded-2xl p-6 text-center border border-destructive/30 bg-destructive/5"
+      >
+        <div className="flex items-center justify-center gap-3 mb-2">
+          <XCircle className="w-5 h-5 text-destructive" />
+          <span className="text-destructive font-semibold">
+            Deadline Passed • {completedCount}/{dailyGoal} reps
+          </span>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Come back tomorrow for a fresh start!
+        </p>
+      </motion.div>
+    );
+  }
 
   if (isComplete) {
     return (

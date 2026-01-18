@@ -182,6 +182,23 @@ export const useHabitStore = () => {
     return { hours, minutes, seconds, totalMs: diff };
   }, []);
 
+  // Handle deadline expiry - break streak if reps not complete
+  const handleDeadlineExpired = useCallback(() => {
+    setState(prev => {
+      if (!prev.habit) return prev;
+      
+      // Only break streak if daily goal wasn't met
+      if (prev.todayCompletedCount < prev.habit.dailyGoal) {
+        return {
+          ...prev,
+          streak: 0, // Reset streak
+          todayCompletedCount: 0, // Reset today's count
+        };
+      }
+      return prev;
+    });
+  }, []);
+
   return {
     ...state,
     setHabit,
@@ -189,5 +206,6 @@ export const useHabitStore = () => {
     isTodayComplete,
     resetHabit,
     getTimeRemaining,
+    handleDeadlineExpired,
   };
 };

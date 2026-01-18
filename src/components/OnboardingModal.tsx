@@ -153,10 +153,15 @@ export const OnboardingModal = ({ isOpen, onComplete }: OnboardingModalProps) =>
     setRecordingProgress(100);
   };
 
-  const resetRecording = () => {
+  const resetRecording = async () => {
     setRecordedFrames([]);
     setRecordingProgress(0);
     setPreviewFrame(null);
+    
+    // Restart the camera after reset
+    if (!streamRef.current) {
+      await startCamera();
+    }
   };
 
   const handleNext = () => {

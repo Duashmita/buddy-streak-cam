@@ -19,6 +19,7 @@ const Index = () => {
     recordCompletion,
     isTodayComplete,
     resetHabit,
+    handleDeadlineExpired,
   } = useHabitStore();
 
   const [shouldStopCamera, setShouldStopCamera] = useState(false);
@@ -80,6 +81,10 @@ const Index = () => {
           dailyGoal={habit.dailyGoal} 
           completedCount={todayCompletedCount}
           deadlineTime={habit.deadlineTime}
+          onDeadlineExpired={() => {
+            handleDeadlineExpired();
+            setShouldStopCamera(true);
+          }}
         />
 
         {/* Main grid */}
