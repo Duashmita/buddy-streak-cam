@@ -38,16 +38,23 @@ export const CameraView = ({
 
   const isAllComplete = completedCount >= dailyGoal;
 
-  // Auto-start camera on mount
+  // Auto-start camera on mount - delay slightly to ensure video element is attached
   useEffect(() => {
     let mounted = true;
     
     const initCamera = async () => {
+      // Small delay to ensure video element is in DOM
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       if (!isAllComplete && mounted) {
+        console.log('[CameraView] Starting camera...');
         const success = await startCamera();
+        console.log('[CameraView] Camera start result:', success);
+        
         // Start detection immediately after camera starts
         if (success && mounted) {
           setTimeout(() => {
+            console.log('[CameraView] Starting detection...');
             startDetection();
           }, 200);
         }
@@ -57,6 +64,7 @@ export const CameraView = ({
     initCamera();
     
     return () => {
+      console.log('[CameraView] Cleanup - stopping camera');
       mounted = false;
       stopCamera();
     };

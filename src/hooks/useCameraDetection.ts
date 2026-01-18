@@ -103,11 +103,13 @@ export const useCameraDetection = (referenceFrames?: string[]) => {
   };
 
   const startCamera = useCallback(async () => {
+    console.log('[Camera] startCamera called, mounted:', mountedRef.current);
     if (!mountedRef.current) return false;
     
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
+      console.log('[Camera] Requesting getUserMedia...');
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 640 },
@@ -117,6 +119,8 @@ export const useCameraDetection = (referenceFrames?: string[]) => {
         audio: false,
       });
 
+      console.log('[Camera] Got stream, mounted:', mountedRef.current);
+      
       // Check if unmounted while waiting for camera
       if (!mountedRef.current) {
         stream.getTracks().forEach(track => track.stop());
@@ -125,9 +129,33 @@ export const useCameraDetection = (referenceFrames?: string[]) => {
 
       streamRef.current = stream;
 
+      // Wait for video element to be available
+      let attempts = 0;
+      while (!videoRef.current && attempts < 20) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        attempts++;
+      }
+      
+      console.log('[Camera] Video ref available:', !!videoRef.current, 'after attempts:', attempts);
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        
+        // Wait for video to be ready
+        await new Promise<void>((resolve) => {
+          const video = videoRef.current!;
+          if (video.readyState >= 2) {
+            resolve();
+          } else {
+            video.onloadeddata = () => resolve();
+          }
+        });
+        
         await videoRef.current.play();
+        console.log('[Camera] Video playing, readyState:', videoRef.current.readyState);
+      } else {
+        console.error('[Camera] Video element not found after waiting');
+        throw new Error('Video element not available');
       }
 
       // Check again after play
@@ -143,9 +171,10 @@ export const useCameraDetection = (referenceFrames?: string[]) => {
         isLoading: false,
       }));
 
+      console.log('[Camera] Camera started successfully');
       return true;
     } catch (error: any) {
-      console.error('Failed to start camera:', error);
+      console.error('[Camera] Failed to start camera:', error);
       if (mountedRef.current) {
         setState(prev => ({
           ...prev,
