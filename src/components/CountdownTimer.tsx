@@ -5,16 +5,15 @@ import { Clock, AlertTriangle, PartyPopper, XCircle } from 'lucide-react';
 interface CountdownTimerProps {
   dailyGoal: number;
   completedCount: number;
-  deadlineTime?: string; // HH:MM format
   onDeadlineExpired?: () => void;
 }
 
 export const CountdownTimer = ({ 
   dailyGoal, 
   completedCount, 
-  deadlineTime = '23:59',
   onDeadlineExpired,
 }: CountdownTimerProps) => {
+  const deadlineTime = '23:59'; // Fixed deadline at 11:59 PM
   const [timeRemaining, setTimeRemaining] = useState({
     hours: 0,
     minutes: 0,
@@ -127,7 +126,7 @@ export const CountdownTimer = ({
           transition={{ delay: 0.7 }}
           className="mt-4 text-sm text-destructive/70"
         >
-          New period starts at {deadlineTime}
+          New day starts at midnight
         </motion.div>
       </motion.div>
     );
@@ -225,7 +224,7 @@ export const CountdownTimer = ({
       <p className="text-sm text-muted-foreground mt-3">
         {isUrgent
           ? `Complete ${dailyGoal - completedCount} more rep${dailyGoal - completedCount > 1 ? 's' : ''} to save your streak!`
-          : `Complete all ${dailyGoal} reps before ${deadlineTime}`}
+          : `Complete all ${dailyGoal} reps before midnight`}
       </p>
     </motion.div>
   );

@@ -80,7 +80,6 @@ const Index = () => {
         <CountdownTimer 
           dailyGoal={habit.dailyGoal} 
           completedCount={todayCompletedCount}
-          deadlineTime={habit.deadlineTime}
           onDeadlineExpired={() => {
             handleDeadlineExpired();
             setShouldStopCamera(true);
