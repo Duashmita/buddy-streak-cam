@@ -280,19 +280,6 @@ export const CameraView = ({
                   </div>
                 )}
 
-                {/* Motion level bar */}
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-48">
-                  <div className="h-2 bg-background/50 rounded-full overflow-hidden backdrop-blur-sm">
-                    <motion.div
-                      className={`h-full transition-colors ${
-                        state.patternMatch 
-                          ? 'bg-success' 
-                          : 'bg-gradient-to-r from-primary via-accent to-secondary'
-                      }`}
-                      animate={{ width: `${Math.min(state.motionLevel * 3, 100)}%` }}
-                    />
-                  </div>
-                </div>
 
                 {/* Just completed overlay */}
                 <AnimatePresence>
