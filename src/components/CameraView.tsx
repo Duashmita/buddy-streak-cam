@@ -38,34 +38,25 @@ export const CameraView = ({
 
   const isAllComplete = completedCount >= dailyGoal;
 
-  // Auto-start camera on mount
+  // Cleanup camera on unmount only - don't auto-start
   useEffect(() => {
-    let mounted = true;
-    
-    const initCamera = async () => {
-      if (!isAllComplete && mounted) {
-        console.log('[CameraView] Starting camera...');
-        const success = await startCamera();
-        console.log('[CameraView] Camera start result:', success);
-        
-        // Start detection immediately after camera starts
-        if (success && mounted) {
-          console.log('[CameraView] Starting detection...');
-          startDetection();
-        }
-      }
-    };
-    
-    // Small delay to ensure component is fully mounted
-    const timer = setTimeout(initCamera, 50);
-    
     return () => {
       console.log('[CameraView] Cleanup - stopping camera');
-      mounted = false;
-      clearTimeout(timer);
       stopCamera();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle manual camera start
+  const handleStartCamera = async () => {
+    console.log('[CameraView] Manual camera start requested');
+    const success = await startCamera();
+    console.log('[CameraView] Camera start result:', success);
+    
+    if (success) {
+      console.log('[CameraView] Starting detection...');
+      startDetection();
+    }
+  };
 
   // Track consecutive pattern matches
   useEffect(() => {
@@ -117,7 +108,7 @@ export const CameraView = ({
     if (state.isActive) {
       stopCamera();
     } else {
-      await startCamera();
+      await handleStartCamera();
     }
   };
 
@@ -350,7 +341,7 @@ export const CameraView = ({
               <>
                 <AlertCircle className="w-12 h-12 text-destructive" />
                 <p className="text-destructive text-center px-8">{state.error}</p>
-                <Button onClick={startCamera} variant="outline" className="mt-2">
+                <Button onClick={handleStartCamera} variant="outline" className="mt-2">
                   <Camera className="w-4 h-4 mr-2" />
                   Try Again
                 </Button>
@@ -372,7 +363,7 @@ export const CameraView = ({
                     Your movement pattern is ready!
                   </p>
                 )}
-                <Button onClick={startCamera} className="mt-2 bg-gradient-to-r from-primary to-accent">
+                <Button onClick={handleStartCamera} className="mt-2 bg-gradient-to-r from-primary to-accent">
                   <Camera className="w-4 h-4 mr-2" />
                   Start Camera
                 </Button>
