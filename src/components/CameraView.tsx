@@ -43,18 +43,14 @@ export const CameraView = ({
   // isn't constantly reset by fast matchScore updates.
   const matchZoneRef = useRef(false);
   const isActiveRef = useRef(false);
-  const lastGoodMatchRef = useRef(0);
 
   useEffect(() => {
-    const isInMatchZone = state.patternMatch || (state.matchScore >= 70 && state.motionLevel >= 0.3);
+    // Timer only ticks when match is 99%+ (UI shows 100%)
+    const isInMatchZone = state.matchScore >= 99;
 
     matchZoneRef.current = isInMatchZone;
     isActiveRef.current = state.isActive;
-
-    if (isInMatchZone) {
-      lastGoodMatchRef.current = Date.now();
-    }
-  }, [state.patternMatch, state.matchScore, state.motionLevel, state.isActive]);
+  }, [state.matchScore, state.isActive]);
 
   const isAllComplete = completedCount >= dailyGoal;
 
@@ -103,25 +99,17 @@ export const CameraView = ({
     }
   }, [matchStreak, state.matchScore, isAllComplete, justCompleted, repTimer, movementDuration]);
 
-  // Rep timer countdown (ticks once per second, pauses if match drops)
+  // Rep timer countdown (ticks once per second, pauses immediately if match drops below 99%)
   const isTimerRunning = repTimer !== null && repTimer > 0;
 
   useEffect(() => {
     if (!isTimerRunning) return;
 
-    const graceMs = 2000;
-
     const interval = window.setInterval(() => {
       if (!isActiveRef.current) return;
 
-      // Refresh "last good" timestamp while we're matching.
-      if (matchZoneRef.current) {
-        lastGoodMatchRef.current = Date.now();
-      }
-
-      // Allow brief dips without freezing the timer.
-      const withinGrace = Date.now() - lastGoodMatchRef.current < graceMs;
-      if (!withinGrace) return;
+      // Pause immediately if match drops below 99%
+      if (!matchZoneRef.current) return;
 
       setRepTimer(prev => (prev === null ? null : Math.max(prev - 1, 0)));
     }, 1000);
