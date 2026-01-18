@@ -110,13 +110,13 @@ const Index = () => {
           <MilestoneCards streak={streak} />
         </motion.section>
 
-        {/* Manual check-in button (fallback) */}
+        {/* Action buttons */}
         {!isTodayComplete() && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
-            className="text-center"
+            className="flex flex-col sm:flex-row items-center justify-center gap-3"
           >
             <button
               onClick={handleActionDetected}
@@ -124,6 +124,19 @@ const Index = () => {
             >
               Camera not working? Click for manual check-in ({todayCompletedCount + 1}/{habit.dailyGoal})
             </button>
+            
+            {/* Save & Leave button - only show if at least 1 rep done */}
+            {todayCompletedCount >= 1 && (
+              <button
+                onClick={() => {
+                  // Just navigate away or show completion message
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-6 py-3 rounded-2xl bg-success/20 hover:bg-success/30 text-success hover:text-success transition-colors text-sm border border-success/30"
+              >
+                ✓ Save {todayCompletedCount} rep{todayCompletedCount > 1 ? 's' : ''} & take a break
+              </button>
+            )}
           </motion.div>
         )}
 

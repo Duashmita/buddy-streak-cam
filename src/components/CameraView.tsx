@@ -33,7 +33,6 @@ export const CameraView = ({
     hasLearnedPattern,
   } = useCameraDetection(safeReferenceFrames);
 
-  const [countdown, setCountdown] = useState<number | null>(null);
   const [repTimer, setRepTimer] = useState<number | null>(null);
   const [justCompleted, setJustCompleted] = useState(false);
   const [matchStreak, setMatchStreak] = useState(0);
@@ -71,7 +70,7 @@ export const CameraView = ({
     const readyToTrigger = matchStreak > 12 && state.matchScore > 50;
 
     if (readyToTrigger) {
-      if (repTimer === null && countdown === null) {
+      if (repTimer === null) {
         setRepTimer(movementDuration);
       }
       return;
@@ -80,14 +79,21 @@ export const CameraView = ({
     if (repTimer !== null && matchStreak < 2) {
       setRepTimer(null);
     }
-  }, [matchStreak, state.matchScore, isAllComplete, justCompleted, repTimer, countdown, movementDuration]);
+  }, [matchStreak, state.matchScore, isAllComplete, justCompleted, repTimer, movementDuration]);
 
-  // Rep timer countdown
+  // Rep timer countdown - complete immediately when timer hits 0
   useEffect(() => {
     if (repTimer === null) return;
     if (repTimer === 0) {
-      setCountdown(3);
+      // Complete the rep immediately
+      setJustCompleted(true);
+      setMatchStreak(0);
       setRepTimer(null);
+      onActionDetected();
+      
+      setTimeout(() => {
+        setJustCompleted(false);
+      }, 2000);
       return;
     }
 
@@ -96,29 +102,7 @@ export const CameraView = ({
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [repTimer]);
-
-  // Final 3-2-1 countdown
-  useEffect(() => {
-    if (countdown === null) return;
-    if (countdown === 0) {
-      setJustCompleted(true);
-      setMatchStreak(0);
-      onActionDetected();
-      
-      setTimeout(() => {
-        setJustCompleted(false);
-      }, 2000);
-      setCountdown(null);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setCountdown(countdown - 1);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [countdown, onActionDetected]);
+  }, [repTimer, onActionDetected]);
 
   const handleToggleCamera = async () => {
     if (state.isActive) {
@@ -209,42 +193,25 @@ export const CameraView = ({
       {/* Camera Feed with side timer */}
       <div className="flex">
         {/* Timer sidebar */}
-        {state.isActive && (repTimer !== null || countdown !== null) && !justCompleted && (
+        {state.isActive && repTimer !== null && !justCompleted && (
           <div className="w-24 flex-shrink-0 bg-muted/20 border-r border-border/30 flex flex-col items-center justify-center p-4">
-            {repTimer !== null && countdown === null && (
-              <>
-                <p className="text-xs text-muted-foreground mb-1">Time left</p>
-                <motion.div
-                  key={repTimer}
-                  initial={{ scale: 0.9 }}
-                  animate={{ scale: 1 }}
-                  className="text-3xl font-display font-bold text-primary"
-                >
-                  {formatTime(repTimer)}
-                </motion.div>
-                <div className="mt-3 w-full h-24 bg-muted/30 rounded-full overflow-hidden relative">
-                  <motion.div
-                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-primary to-accent"
-                    animate={{ height: `${((movementDuration - repTimer) / movementDuration) * 100}%` }}
-                    transition={{ duration: 0.3 }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">Keep moving!</p>
-              </>
-            )}
-            {countdown !== null && (
-              <>
-                <p className="text-xs text-success mb-1">Almost done!</p>
-                <motion.div
-                  key={countdown}
-                  initial={{ scale: 0.5, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="text-4xl font-display font-bold text-success"
-                >
-                  {countdown}
-                </motion.div>
-              </>
-            )}
+            <p className="text-xs text-muted-foreground mb-1">Time left</p>
+            <motion.div
+              key={repTimer}
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              className="text-3xl font-display font-bold text-primary"
+            >
+              {formatTime(repTimer)}
+            </motion.div>
+            <div className="mt-3 w-full h-24 bg-muted/30 rounded-full overflow-hidden relative">
+              <motion.div
+                className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-primary to-accent"
+                animate={{ height: `${((movementDuration - repTimer) / movementDuration) * 100}%` }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">Keep moving!</p>
           </div>
         )}
 
