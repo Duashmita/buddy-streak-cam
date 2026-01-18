@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, CameraOff, Loader2, Check, AlertCircle, Sparkles, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,16 @@ export const CameraView = ({
   const [justCompleted, setJustCompleted] = useState(false);
   const [matchStreak, setMatchStreak] = useState(0);
 
+  // Keep frequently-changing detection signals in refs so the countdown timer
+  // isn't constantly reset by fast matchScore updates.
+  const matchZoneRef = useRef(false);
+  const isActiveRef = useRef(false);
+
+  useEffect(() => {
+    matchZoneRef.current = state.patternMatch || state.matchScore >= 70;
+    isActiveRef.current = state.isActive;
+  }, [state.patternMatch, state.matchScore, state.isActive]);
+
   const isAllComplete = completedCount >= dailyGoal;
 
   // Cleanup camera on unmount only
@@ -64,13 +74,13 @@ export const CameraView = ({
 
   // Track consecutive matches with stickiness
   useEffect(() => {
-    const isInMatchZone = state.patternMatch || (state.matchScore >= 70 && state.motionLevel >= 1);
+    const isInMatchZone = state.patternMatch || state.matchScore >= 70;
     if (isInMatchZone) {
       setMatchStreak(prev => Math.min(prev + 1, 180));
     } else {
       setMatchStreak(prev => Math.max(prev - 2, 0));
     }
-  }, [state.patternMatch, state.matchScore, state.motionLevel]);
+  }, [state.patternMatch, state.matchScore]);
 
   // Monitor for sustained matching to start rep timer
   useEffect(() => {
@@ -78,48 +88,41 @@ export const CameraView = ({
 
     const readyToTrigger = matchStreak > 12 && state.matchScore > 50;
 
-    if (readyToTrigger) {
-      if (repTimer === null) {
-        setRepTimer(movementDuration);
-      }
-      return;
-    }
-
-    if (repTimer !== null && matchStreak < 2) {
-      setRepTimer(null);
+    if (readyToTrigger && repTimer === null) {
+      setRepTimer(movementDuration);
     }
   }, [matchStreak, state.matchScore, isAllComplete, justCompleted, repTimer, movementDuration]);
 
-  // Rep timer countdown - use interval for reliable countdown
-  useEffect(() => {
-    if (repTimer === null) return;
-    
-    if (repTimer === 0) {
-      // Complete the rep immediately
-      setJustCompleted(true);
-      setMatchStreak(0);
-      setRepTimer(null);
-      onActionDetected();
-      
-      setTimeout(() => {
-        setJustCompleted(false);
-      }, 2000);
-      return;
-    }
+  // Rep timer countdown (ticks once per second, pauses if match drops)
+  const isTimerRunning = repTimer !== null && repTimer > 0;
 
-    // Use setInterval for more reliable countdown
-    const interval = setInterval(() => {
-      setRepTimer(prev => {
-        if (prev === null || prev <= 0) {
-          clearInterval(interval);
-          return prev;
-        }
-        return prev - 1;
-      });
+  useEffect(() => {
+    if (!isTimerRunning) return;
+
+    const interval = window.setInterval(() => {
+      if (!isActiveRef.current || !matchZoneRef.current) return;
+
+      setRepTimer(prev => (prev === null ? null : Math.max(prev - 1, 0)));
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [repTimer === null, onActionDetected]); // Only re-run when timer starts/stops
+    return () => window.clearInterval(interval);
+  }, [isTimerRunning]);
+
+  // Complete immediately when timer hits 0
+  useEffect(() => {
+    if (repTimer !== 0) return;
+
+    setJustCompleted(true);
+    setMatchStreak(0);
+    setRepTimer(null);
+    onActionDetected();
+
+    const t = window.setTimeout(() => {
+      setJustCompleted(false);
+    }, 2000);
+
+    return () => window.clearTimeout(t);
+  }, [repTimer, onActionDetected]);
 
   const handleToggleCamera = async () => {
     if (state.isActive) {
