@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import { Settings, RotateCcw, Target } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
+import habpetIcon from '@/assets/habpet-icon.png';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -31,9 +32,9 @@ export const HabitHeader = ({ habitName, petName, onReset }: HabitHeaderProps) =
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', delay: 0.2 }}
-          className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center float"
+          className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center float overflow-hidden"
         >
-          <Target className="w-7 h-7 text-primary" />
+          <img src={habpetIcon} alt="Habpet" className="w-10 h-10 object-contain" />
         </motion.div>
         <div>
           <h1 className="text-3xl font-display font-bold gradient-text">
