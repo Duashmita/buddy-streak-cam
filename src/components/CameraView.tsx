@@ -58,25 +58,33 @@ export const CameraView = ({
     }
   };
 
-  // Track consecutive pattern matches
+  // Track consecutive matches with a bit of "stickiness" (prevents flicker)
   useEffect(() => {
-    if (state.patternMatch) {
-      setMatchStreak(prev => prev + 1);
-    } else {
-      setMatchStreak(0);
-    }
-  }, [state.patternMatch]);
+    const isInMatchZone =
+      state.patternMatch || (state.matchScore >= 70 && state.motionLevel >= 1);
 
-  // Monitor for sustained pattern matching to trigger completion
+    if (isInMatchZone) {
+      setMatchStreak(prev => Math.min(prev + 1, 180));
+    } else {
+      // Decay instead of hard reset so brief score drops don't cancel progress
+      setMatchStreak(prev => Math.max(prev - 2, 0));
+    }
+  }, [state.patternMatch, state.matchScore, state.motionLevel]);
+
+  // Monitor for sustained matching to trigger completion
   useEffect(() => {
     if (isAllComplete || justCompleted) return;
 
-    // Much easier to trigger - only need ~1 second of matching
-    if (matchStreak > 10 && state.matchScore > 35) {
-      if (countdown === null) {
-        setCountdown(3);
-      }
-    } else if (matchStreak < 5) {
+    // Match streak is frame-based; keep thresholds small but stable via decay logic above
+    const readyToTrigger = matchStreak > 12 && state.matchScore > 50;
+
+    if (readyToTrigger) {
+      if (countdown === null) setCountdown(3);
+      return;
+    }
+
+    // Only cancel an in-progress countdown if we *really* fell out of the match zone
+    if (countdown !== null && matchStreak < 2) {
       setCountdown(null);
     }
   }, [matchStreak, state.matchScore, isAllComplete, justCompleted, countdown]);

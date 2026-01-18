@@ -291,14 +291,18 @@ export const useCameraDetection = (referenceFrames?: string[]) => {
       if (motionScore > 3) {
         const recentMotion = [...motionHistoryRef.current.slice(-20), motionScore];
         const patternMatchScore = calculatePatternMatch(recentMotion);
-        const isPatternMatch = patternMatchScore > 60 && motionScore > 5;
-        
+        const recentAvgMotion =
+          recentMotion.reduce((a, b) => a + b, 0) / Math.max(recentMotion.length, 1);
+
+        // Use a SMALL average-motion gate (not the instantaneous frame) so brief pauses don't break matching
+        const isPatternMatch = patternMatchScore > 40 && recentAvgMotion > 1;
+
         // Draw overlay
         const hue = isPatternMatch ? 150 : (patternMatchScore > 30 ? 280 : 200);
         const alpha = Math.min(motionScore / 40, 0.35);
         ctx.fillStyle = `hsla(${hue}, 70%, 50%, ${alpha})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
+
         // Draw matching indicator ring
         if (isPatternMatch) {
           ctx.strokeStyle = `hsla(150, 80%, 50%, 0.8)`;
@@ -333,7 +337,13 @@ export const useCameraDetection = (referenceFrames?: string[]) => {
       
       // Calculate pattern match with updated history
       const patternMatchScore = calculatePatternMatch(newHistory);
-      const isPatternMatch = patternMatchScore > 40 && motion > 2;
+
+      // Use average motion in a short window to avoid flicker when the user briefly pauses
+      const recentWindow = newHistory.slice(-6);
+      const avgRecentMotion =
+        recentWindow.reduce((a, b) => a + b, 0) / Math.max(recentWindow.length, 1);
+
+      const isPatternMatch = patternMatchScore > 40 && avgRecentMotion > 1;
       
       setState(prevState => ({
         ...prevState,
