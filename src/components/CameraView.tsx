@@ -71,12 +71,12 @@ export const CameraView = ({
   useEffect(() => {
     if (isAllComplete || justCompleted) return;
 
-    // Need sustained pattern match (about 2 seconds of matching)
-    if (matchStreak > 20 && state.matchScore > 55) {
+    // Much easier to trigger - only need ~1 second of matching
+    if (matchStreak > 10 && state.matchScore > 35) {
       if (countdown === null) {
         setCountdown(3);
       }
-    } else if (matchStreak < 10) {
+    } else if (matchStreak < 5) {
       setCountdown(null);
     }
   }, [matchStreak, state.matchScore, isAllComplete, justCompleted, countdown]);

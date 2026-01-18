@@ -216,27 +216,36 @@ export const useCameraDetection = (referenceFrames?: string[]) => {
   }, []);
 
   const calculatePatternMatch = useCallback((recentMotion: number[]): number => {
-    if (!learnedPatternRef.current || recentMotion.length < 5) return 0;
+    // If no pattern learned, just check for any significant motion
+    if (!learnedPatternRef.current || recentMotion.length < 3) {
+      const avgMotion = recentMotion.reduce((a, b) => a + b, 0) / Math.max(recentMotion.length, 1);
+      // Any motion above threshold counts as a match
+      return avgMotion > 3 ? Math.min(avgMotion * 15, 100) : 0;
+    }
 
     const pattern = learnedPatternRef.current;
     
-    // Compare motion characteristics
+    // Compare motion characteristics - MORE LENIENT
     const avgMotion = recentMotion.reduce((a, b) => a + b, 0) / recentMotion.length;
     const peakMotion = Math.max(...recentMotion);
     
-    // Intensity similarity (how similar is the average motion level)
-    const intensityRatio = Math.min(avgMotion, pattern.avgIntensity) / 
-                          Math.max(avgMotion, pattern.avgIntensity, 1);
+    // Much more lenient intensity comparison
+    // Just check if there's roughly similar activity level (within 3x range)
+    const intensityRatio = Math.min(avgMotion * 3, pattern.avgIntensity * 3) / 
+                          Math.max(avgMotion, pattern.avgIntensity, 0.1);
+    const intensityScore = Math.min(intensityRatio, 1);
     
-    // Peak similarity (how similar are the peak movements)
-    const peakRatio = Math.min(peakMotion, pattern.peakMotion) / 
-                     Math.max(peakMotion, pattern.peakMotion, 1);
+    // Lenient peak comparison (within 4x range is acceptable)
+    const peakRatio = Math.min(peakMotion * 4, pattern.peakMotion * 4) / 
+                     Math.max(peakMotion, pattern.peakMotion, 0.1);
+    const peakScore = Math.min(peakRatio, 1);
     
-    // Activity level check (is there enough motion happening)
-    const activityBonus = avgMotion > pattern.avgIntensity * 0.5 ? 1 : 0.5;
+    // Activity bonus - just need 20% of learned intensity to get full bonus
+    const activityBonus = avgMotion > pattern.avgIntensity * 0.2 ? 1 : 
+                         avgMotion > pattern.avgIntensity * 0.1 ? 0.7 : 0.4;
     
-    // Combined score
-    const matchScore = ((intensityRatio * 0.4) + (peakRatio * 0.4) + (activityBonus * 0.2)) * 100;
+    // Combined score - weighted more towards just having motion
+    const matchScore = ((intensityScore * 0.25) + (peakScore * 0.25) + (activityBonus * 0.5)) * 100;
     
     return Math.min(matchScore, 100);
   }, []);
@@ -324,7 +333,7 @@ export const useCameraDetection = (referenceFrames?: string[]) => {
       
       // Calculate pattern match with updated history
       const patternMatchScore = calculatePatternMatch(newHistory);
-      const isPatternMatch = patternMatchScore > 60 && motion > 5;
+      const isPatternMatch = patternMatchScore > 40 && motion > 2;
       
       setState(prevState => ({
         ...prevState,
