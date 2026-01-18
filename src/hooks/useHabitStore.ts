@@ -40,6 +40,20 @@ const getTodayKey = () => {
   return now.toISOString().split('T')[0];
 };
 
+// Get yesterday's date key (accounting for demo offset)
+const getYesterdayKey = () => {
+  const now = new Date();
+  now.setDate(now.getDate() + getDemoOffset() - 1);
+  return now.toISOString().split('T')[0];
+};
+
+// Get current demo date
+const getDemoDate = () => {
+  const now = new Date();
+  now.setDate(now.getDate() + getDemoOffset());
+  return now;
+};
+
 export const useHabitStore = () => {
   const [state, setState] = useState<HabitState>({
     habit: null,
@@ -70,12 +84,10 @@ export const useHabitStore = () => {
           
           // Check if we need to reset streak (missed yesterday)
           let newStreak = parsed.streak || 0;
+          const yesterdayKey = getYesterdayKey();
+          
           if (parsed.lastCompletedDate && parsed.lastCompletedDate !== todayKey) {
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayKey = yesterday.toISOString().split('T')[0];
-            
-            // If last completion wasn't yesterday or today, reset streak
+            // If last completion wasn't yesterday, reset streak
             if (parsed.lastCompletedDate !== yesterdayKey) {
               newStreak = 0;
             }
@@ -175,14 +187,16 @@ export const useHabitStore = () => {
       let newLastDate = prev.lastCompletedDate;
 
       if (isGoalComplete) {
-        // Get yesterday's date key
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayKey = yesterday.toISOString().split('T')[0];
+        const yesterdayKey = getYesterdayKey();
 
         if (prev.lastCompletedDate === yesterdayKey) {
+          // Completed yesterday, streak continues
           newStreak = prev.streak + 1;
-        } else if (prev.lastCompletedDate !== todayKey) {
+        } else if (prev.lastCompletedDate === todayKey) {
+          // Already completed today, no change
+          newStreak = prev.streak;
+        } else {
+          // Start fresh streak
           newStreak = 1;
         }
 
@@ -251,25 +265,28 @@ export const useHabitStore = () => {
   // Demo: Skip forward 24 hours
   const skipDay = useCallback(() => {
     const currentOffset = getDemoOffset();
-    localStorage.setItem(DEMO_OFFSET_KEY, String(currentOffset + 1));
+    const newOffset = currentOffset + 1;
+    localStorage.setItem(DEMO_OFFSET_KEY, String(newOffset));
     
-    // Force reload state with new day
-    const todayKey = getTodayKey();
+    // Calculate new date keys with new offset
+    const now = new Date();
+    const newTodayDate = new Date(now);
+    newTodayDate.setDate(newTodayDate.getDate() + newOffset);
+    const newTodayKey = newTodayDate.toISOString().split('T')[0];
+    
+    const newYesterdayDate = new Date(now);
+    newYesterdayDate.setDate(newYesterdayDate.getDate() + newOffset - 1);
+    const newYesterdayKey = newYesterdayDate.toISOString().split('T')[0];
+    
     setState(prev => {
       if (!prev.habit) return prev;
       
-      const todayRecord = prev.dailyRecords.find(r => r.date === todayKey);
+      const todayRecord = prev.dailyRecords.find(r => r.date === newTodayKey);
       
-      // Check streak logic
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() + getDemoOffset() - 1);
-      const yesterdayKey = yesterday.toISOString().split('T')[0];
-      
+      // Check streak logic - if last completion wasn't yesterday, reset
       let newStreak = prev.streak;
-      if (prev.lastCompletedDate && prev.lastCompletedDate !== todayKey) {
-        if (prev.lastCompletedDate !== yesterdayKey) {
-          newStreak = 0;
-        }
+      if (prev.lastCompletedDate !== newYesterdayKey && prev.lastCompletedDate !== newTodayKey) {
+        newStreak = 0;
       }
       
       return {
@@ -279,6 +296,9 @@ export const useHabitStore = () => {
       };
     });
   }, []);
+
+  // Get current demo date for display
+  const getCurrentDemoDate = useCallback(() => getDemoDate(), []);
 
   // Demo: Reset day offset
   const resetDemoMode = useCallback(() => {
@@ -301,5 +321,6 @@ export const useHabitStore = () => {
     skipDay,
     resetDemoMode,
     getDemoDay,
+    getCurrentDemoDate,
   };
 };

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import { format } from 'date-fns';
 import { useHabitStore } from '@/hooks/useHabitStore';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { HabitHeader } from '@/components/HabitHeader';
@@ -25,9 +26,23 @@ const Index = () => {
     skipDay,
     resetDemoMode,
     getDemoDay,
+    getCurrentDemoDate,
+    getTimeRemaining,
   } = useHabitStore();
 
   const [shouldStopCamera, setShouldStopCamera] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState({ hours: 0, minutes: 0, seconds: 0 });
+
+  // Update time remaining every second
+  useEffect(() => {
+    const updateTime = () => {
+      const remaining = getTimeRemaining();
+      setTimeRemaining(remaining);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, [getTimeRemaining]);
 
   const handleActionDetected = () => {
     const wasComplete = isTodayComplete();
@@ -80,6 +95,25 @@ const Index = () => {
       {/* Main content */}
       <div className="relative max-w-6xl mx-auto p-6 space-y-8">
         <HabitHeader habitName={habit.habitName} onReset={resetHabit} />
+
+        {/* Date & Time Display */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 text-center"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-semibold text-foreground">
+              📅 {format(getCurrentDemoDate(), 'EEEE, MMMM d, yyyy')}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-muted/50 border border-border/30">
+            <span className="text-sm text-muted-foreground">Time left today:</span>
+            <span className="text-sm font-mono font-medium text-primary">
+              {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')}
+            </span>
+          </div>
+        </motion.div>
 
         {/* Countdown Timer */}
         <CountdownTimer 
