@@ -8,6 +8,7 @@ import { CountdownTimer } from '@/components/CountdownTimer';
 import { StreakDisplay } from '@/components/StreakDisplay';
 import { CameraView } from '@/components/CameraView';
 import { MilestoneCards } from '@/components/MilestoneCards';
+import { DurationEditor } from '@/components/DurationEditor';
 
 const Index = () => {
   const {
@@ -16,6 +17,7 @@ const Index = () => {
     longestStreak,
     todayCompletedCount,
     setHabit,
+    updateMovementDuration,
     recordCompletion,
     isTodayComplete,
     resetHabit,
@@ -147,6 +149,19 @@ const Index = () => {
             )}
           </motion.div>
         )}
+
+        {/* Duration Editor */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="flex justify-center"
+        >
+          <DurationEditor
+            currentDuration={habit.movementDuration}
+            onDurationChange={updateMovementDuration}
+          />
+        </motion.div>
 
         {/* Footer */}
         <footer className="text-center text-sm text-muted-foreground pt-8 pb-4">

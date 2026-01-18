@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Volume2, Hand, Music, Lock, Unlock } from 'lucide-react';
+import { Lock, Unlock, HelpCircle } from 'lucide-react';
 
 interface MilestoneCardsProps {
   streak: number;
@@ -7,40 +7,59 @@ interface MilestoneCardsProps {
 
 const milestones = [
   {
-    id: 'sound',
+    id: 'blink-sound',
+    day: 1,
+    title: 'Blinking & Sound Unlocked',
+    description: 'Buddy blinks and makes sounds when you complete a rep!',
+    emoji: '✨🔊',
+  },
+  {
+    id: 'color-change',
     day: 3,
-    title: 'Sound Reactions',
-    description: 'Buddy pulses with sound when you approach',
-    icon: Volume2,
-    emoji: '🔊',
+    title: 'Changes Color on Interaction',
+    description: 'Buddy changes color when you interact with it!',
+    emoji: '🌈',
   },
   {
-    id: 'nod',
+    id: 'wag-tail',
     day: 7,
-    title: 'Head Nods',
-    description: 'Buddy nods its head to greet you',
-    icon: Hand,
-    emoji: '👋',
+    title: 'Wags Tail & New Sound',
+    description: 'Buddy wags its tail and unlocks a new excited sound!',
+    emoji: '🐕💫',
   },
   {
-    id: 'chitter',
+    id: 'petting',
     day: 14,
-    title: 'Chittering',
-    description: 'Buddy makes happy chirping sounds',
-    icon: Music,
-    emoji: '🎵',
+    title: 'Reacts to Petting',
+    description: 'Buddy responds to gentle petting with happy reactions!',
+    emoji: '🤗💕',
+  },
+  {
+    id: 'everything',
+    day: 30,
+    title: 'Everything Unlocked',
+    description: 'All of Buddy\'s abilities are now fully unlocked!',
+    emoji: '🎉🏆',
   },
 ];
 
 export const MilestoneCards = ({ streak }: MilestoneCardsProps) => {
+  // Find the index of the next milestone to unlock
+  const nextMilestoneIndex = milestones.findIndex(m => streak < m.day);
+  
   return (
     <div className="space-y-4">
       <h3 className="font-display font-semibold text-lg">Milestone Unlocks</h3>
       
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {milestones.map((milestone, index) => {
           const isUnlocked = streak >= milestone.day;
-          const isNext = !isUnlocked && (index === 0 || streak >= milestones[index - 1].day);
+          const isNext = index === nextMilestoneIndex;
+          const isAfterNext = index === nextMilestoneIndex + 1;
+          const isMystery = index > nextMilestoneIndex + 1;
+          
+          // Don't show milestones beyond the one after next
+          if (isMystery) return null;
           
           return (
             <motion.div
@@ -53,7 +72,7 @@ export const MilestoneCards = ({ streak }: MilestoneCardsProps) => {
                   ? 'border border-primary/30 glow-primary'
                   : isNext
                   ? 'border border-border/50'
-                  : 'opacity-50'
+                  : 'border border-border/30 opacity-70'
               }`}
             >
               {/* Background glow for unlocked */}
@@ -66,6 +85,8 @@ export const MilestoneCards = ({ streak }: MilestoneCardsProps) => {
                 className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${
                   isUnlocked
                     ? 'bg-success/20 text-success'
+                    : isAfterNext
+                    ? 'bg-muted/50 text-muted-foreground'
                     : 'bg-muted text-muted-foreground'
                 }`}
               >
@@ -73,6 +94,11 @@ export const MilestoneCards = ({ streak }: MilestoneCardsProps) => {
                   <>
                     <Unlock className="w-3 h-3" />
                     Unlocked
+                  </>
+                ) : isAfterNext ? (
+                  <>
+                    <HelpCircle className="w-3 h-3" />
+                    Mystery
                   </>
                 ) : (
                   <>
@@ -84,9 +110,19 @@ export const MilestoneCards = ({ streak }: MilestoneCardsProps) => {
 
               {/* Content */}
               <div className="relative">
-                <span className="text-3xl mb-3 block">{milestone.emoji}</span>
-                <h4 className="font-display font-semibold mb-1">{milestone.title}</h4>
-                <p className="text-sm text-muted-foreground">{milestone.description}</p>
+                {isAfterNext ? (
+                  <>
+                    <span className="text-3xl mb-3 block">❓</span>
+                    <h4 className="font-display font-semibold mb-1">???</h4>
+                    <p className="text-sm text-muted-foreground">Complete the next milestone to reveal...</p>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-3xl mb-3 block">{milestone.emoji}</span>
+                    <h4 className="font-display font-semibold mb-1">{milestone.title}</h4>
+                    <p className="text-sm text-muted-foreground">{milestone.description}</p>
+                  </>
+                )}
               </div>
 
               {/* Progress indicator for next milestone */}

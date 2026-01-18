@@ -87,6 +87,19 @@ export const useHabitStore = () => {
     }));
   }, []);
 
+  const updateMovementDuration = useCallback((newDuration: number) => {
+    setState(prev => {
+      if (!prev.habit) return prev;
+      return {
+        ...prev,
+        habit: {
+          ...prev.habit,
+          movementDuration: newDuration,
+        },
+      };
+    });
+  }, []);
+
   const recordCompletion = useCallback(() => {
     setState(prev => {
       if (!prev.habit) return prev;
@@ -202,6 +215,7 @@ export const useHabitStore = () => {
   return {
     ...state,
     setHabit,
+    updateMovementDuration,
     recordCompletion,
     isTodayComplete,
     resetHabit,
