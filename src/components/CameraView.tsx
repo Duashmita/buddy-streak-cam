@@ -9,7 +9,7 @@ interface CameraViewProps {
   referenceFrames: string[];
   dailyGoal: number;
   completedCount: number;
-  movementDuration?: number; // Duration in seconds for each rep
+  movementDuration?: number;
   onActionDetected: () => void;
 }
 
@@ -27,7 +27,6 @@ export const CameraView = ({
     videoRef,
     canvasRef,
     state,
-    motionHistory,
     startCamera,
     stopCamera,
     startDetection,
@@ -35,41 +34,32 @@ export const CameraView = ({
   } = useCameraDetection(safeReferenceFrames);
 
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [repTimer, setRepTimer] = useState<number | null>(null); // Timer for movement duration
+  const [repTimer, setRepTimer] = useState<number | null>(null);
   const [justCompleted, setJustCompleted] = useState(false);
   const [matchStreak, setMatchStreak] = useState(0);
 
   const isAllComplete = completedCount >= dailyGoal;
 
-  // Cleanup camera on unmount only - don't auto-start
+  // Cleanup camera on unmount only
   useEffect(() => {
     return () => {
-      console.log('[CameraView] Cleanup - stopping camera');
       stopCamera();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Handle manual camera start
   const handleStartCamera = async () => {
-    console.log('[CameraView] Manual camera start requested');
     const success = await startCamera();
-    console.log('[CameraView] Camera start result:', success);
-    
     if (success) {
-      console.log('[CameraView] Starting detection...');
       startDetection();
     }
   };
 
-  // Track consecutive matches with a bit of "stickiness" (prevents flicker)
+  // Track consecutive matches with stickiness
   useEffect(() => {
-    const isInMatchZone =
-      state.patternMatch || (state.matchScore >= 70 && state.motionLevel >= 1);
-
+    const isInMatchZone = state.patternMatch || (state.matchScore >= 70 && state.motionLevel >= 1);
     if (isInMatchZone) {
       setMatchStreak(prev => Math.min(prev + 1, 180));
     } else {
-      // Decay instead of hard reset so brief score drops don't cancel progress
       setMatchStreak(prev => Math.max(prev - 2, 0));
     }
   }, [state.patternMatch, state.matchScore, state.motionLevel]);
@@ -78,18 +68,15 @@ export const CameraView = ({
   useEffect(() => {
     if (isAllComplete || justCompleted) return;
 
-    // Match streak is frame-based; keep thresholds small but stable via decay logic above
     const readyToTrigger = matchStreak > 12 && state.matchScore > 50;
 
     if (readyToTrigger) {
-      // Start the rep timer if not already running
       if (repTimer === null && countdown === null) {
         setRepTimer(movementDuration);
       }
       return;
     }
 
-    // Only cancel an in-progress timer if we *really* fell out of the match zone
     if (repTimer !== null && matchStreak < 2) {
       setRepTimer(null);
     }
@@ -99,7 +86,6 @@ export const CameraView = ({
   useEffect(() => {
     if (repTimer === null) return;
     if (repTimer === 0) {
-      // Rep timer finished, start 3-2-1 countdown
       setCountdown(3);
       setRepTimer(null);
       return;
@@ -112,7 +98,7 @@ export const CameraView = ({
     return () => clearTimeout(timer);
   }, [repTimer]);
 
-  // Final 3-2-1 countdown before completion
+  // Final 3-2-1 countdown
   useEffect(() => {
     if (countdown === null) return;
     if (countdown === 0) {
@@ -120,7 +106,6 @@ export const CameraView = ({
       setMatchStreak(0);
       onActionDetected();
       
-      // Reset after 2 seconds to allow next rep
       setTimeout(() => {
         setJustCompleted(false);
       }, 2000);
@@ -161,9 +146,16 @@ export const CameraView = ({
 
   const statusMessage = getStatusMessage();
 
+  const formatTime = (seconds: number) => {
+    if (seconds >= 60) {
+      return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+    }
+    return seconds.toString();
+  };
+
   return (
     <div className="glass-card rounded-3xl overflow-hidden">
-      {/* Header with rep counter */}
+      {/* Header */}
       <div className="p-6 border-b border-border/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -180,17 +172,18 @@ export const CameraView = ({
             )}
           </div>
           
-          {/* Rep counter */}
           <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-2xl font-display font-bold">
-                <span className={completedCount > 0 ? 'text-success' : 'text-foreground'}>
-                  {completedCount}
-                </span>
-                <span className="text-muted-foreground">/{dailyGoal}</span>
+            {!isAllComplete && !justCompleted && (
+              <div className="text-right">
+                <div className="text-2xl font-display font-bold">
+                  <span className={completedCount > 0 ? 'text-success' : 'text-foreground'}>
+                    {completedCount}
+                  </span>
+                  <span className="text-muted-foreground">/{dailyGoal}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Today's reps</p>
               </div>
-              <p className="text-xs text-muted-foreground">Today's reps</p>
-            </div>
+            )}
             
             <Button
               variant="outline"
@@ -213,231 +206,215 @@ export const CameraView = ({
         </p>
       </div>
 
-      {/* Camera Feed */}
-      <div className="relative aspect-video bg-muted/30">
-        {/* Always render video/canvas so refs are available - hide when not active */}
-        <video
-          ref={videoRef}
-          className={`absolute inset-0 w-full h-full object-cover ${state.isActive ? '' : 'hidden'}`}
-          autoPlay
-          muted
-          playsInline
-        />
-        <canvas
-          ref={canvasRef}
-          className={`absolute inset-0 w-full h-full object-cover pointer-events-none ${state.isActive ? '' : 'hidden'}`}
-          style={{ mixBlendMode: 'screen', opacity: 0.6 }}
-        />
-        
-        {state.isActive ? (
-          <>
-            {/* Detection overlay */}
-            <div className="absolute inset-0 pointer-events-none">
-              {/* Corner decorations - color changes based on match */}
-              <div className={`absolute top-4 left-4 w-12 h-12 border-t-2 border-l-2 rounded-tl-lg transition-colors ${
-                state.patternMatch ? 'border-success' : 'border-primary/50'
-              }`} />
-              <div className={`absolute top-4 right-4 w-12 h-12 border-t-2 border-r-2 rounded-tr-lg transition-colors ${
-                state.patternMatch ? 'border-success' : 'border-primary/50'
-              }`} />
-              <div className={`absolute bottom-4 left-4 w-12 h-12 border-b-2 border-l-2 rounded-bl-lg transition-colors ${
-                state.patternMatch ? 'border-success' : 'border-primary/50'
-              }`} />
-              <div className={`absolute bottom-4 right-4 w-12 h-12 border-b-2 border-r-2 rounded-br-lg transition-colors ${
-                state.patternMatch ? 'border-success' : 'border-primary/50'
-              }`} />
-
-              {/* Status badge */}
-              <div className="absolute top-4 left-1/2 -translate-x-1/2">
-                <motion.div 
-                  animate={{ scale: state.patternMatch ? [1, 1.05, 1] : 1 }}
-                  transition={{ repeat: state.patternMatch ? Infinity : 0, duration: 0.5 }}
-                  className={`px-4 py-2 rounded-full bg-background/80 backdrop-blur-sm text-sm font-medium ${statusMessage.color}`}
+      {/* Camera Feed with side timer */}
+      <div className="flex">
+        {/* Timer sidebar */}
+        {state.isActive && (repTimer !== null || countdown !== null) && !justCompleted && (
+          <div className="w-24 flex-shrink-0 bg-muted/20 border-r border-border/30 flex flex-col items-center justify-center p-4">
+            {repTimer !== null && countdown === null && (
+              <>
+                <p className="text-xs text-muted-foreground mb-1">Time left</p>
+                <motion.div
+                  key={repTimer}
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  className="text-3xl font-display font-bold text-primary"
                 >
-                  {statusMessage.text}
+                  {formatTime(repTimer)}
                 </motion.div>
-              </div>
-
-              {/* Match score indicator */}
-              {hasLearnedPattern && state.motionLevel > 3 && (
-                <div className="absolute top-14 left-1/2 -translate-x-1/2">
-                  <div className={`px-3 py-1 rounded-full backdrop-blur-sm text-xs flex items-center gap-2 ${
-                    state.patternMatch ? 'bg-success/80 text-success-foreground' : 'bg-background/60'
-                  }`}>
-                    <Sparkles className="w-3 h-3" />
-                    Match: {Math.round(state.matchScore)}%
-                  </div>
-                </div>
-              )}
-
-              {/* Motion level bar */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-48">
-                <div className="h-2 bg-background/50 rounded-full overflow-hidden backdrop-blur-sm">
+                <div className="mt-3 w-full h-24 bg-muted/30 rounded-full overflow-hidden relative">
                   <motion.div
-                    className={`h-full transition-colors ${
-                      state.patternMatch 
-                        ? 'bg-success' 
-                        : 'bg-gradient-to-r from-primary via-accent to-secondary'
-                    }`}
-                    animate={{ width: `${Math.min(state.motionLevel * 3, 100)}%` }}
+                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-primary to-accent"
+                    animate={{ height: `${((movementDuration - repTimer) / movementDuration) * 100}%` }}
+                    transition={{ duration: 0.3 }}
                   />
                 </div>
-              </div>
-
-              {/* Rep timer overlay */}
-              <AnimatePresence>
-                {repTimer !== null && countdown === null && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 flex flex-col items-center justify-center bg-primary/20 backdrop-blur-sm"
-                  >
-                    <p className="text-lg font-medium text-foreground mb-2">Keep going!</p>
-                    <motion.div
-                      key={repTimer}
-                      initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      className="text-7xl font-display font-bold text-primary"
-                    >
-                      {repTimer >= 60 
-                        ? `${Math.floor(repTimer / 60)}:${String(repTimer % 60).padStart(2, '0')}`
-                        : repTimer
-                      }
-                    </motion.div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      {repTimer >= 60 ? 'minutes remaining' : 'seconds remaining'}
-                    </p>
-                    {/* Progress ring */}
-                    <div className="mt-4 w-32 h-2 bg-muted/50 rounded-full overflow-hidden">
-                      <motion.div
-                        className="h-full bg-gradient-to-r from-primary to-accent"
-                        animate={{ width: `${((movementDuration - repTimer) / movementDuration) * 100}%` }}
-                      />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Final 3-2-1 countdown overlay */}
-              <AnimatePresence>
-                {countdown !== null && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    className="absolute inset-0 flex flex-col items-center justify-center bg-success/30 backdrop-blur-sm"
-                  >
-                    <p className="text-lg font-medium text-success mb-2">Almost there!</p>
-                    <motion.div
-                      key={countdown}
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 1.5, opacity: 0 }}
-                      className="text-8xl font-display font-bold text-success"
-                    >
-                      {countdown}
-                    </motion.div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Just completed overlay */}
-              <AnimatePresence>
-                {justCompleted && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 flex flex-col items-center justify-center bg-success/30 backdrop-blur-sm"
-                  >
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: 'spring', damping: 15 }}
-                      className="w-24 h-24 rounded-full bg-success flex items-center justify-center mb-4"
-                    >
-                      <Check className="w-12 h-12 text-success-foreground" />
-                    </motion.div>
-                    <motion.p
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-2xl font-display font-bold text-success"
-                    >
-                      {completedCount + 1}/{dailyGoal} Complete!
-                    </motion.p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* All complete overlay */}
-              <AnimatePresence>
-                {isAllComplete && !justCompleted && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="absolute inset-0 flex flex-col items-center justify-center bg-success/20 backdrop-blur-sm"
-                  >
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: 'spring', damping: 15 }}
-                      className="text-6xl mb-4"
-                    >
-                      🎉
-                    </motion.div>
-                    <p className="text-2xl font-display font-bold text-success">
-                      All {dailyGoal} reps done!
-                    </p>
-                    <p className="text-success/80 mt-1">See you tomorrow!</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </>
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-            {state.isLoading ? (
-              <>
-                <Loader2 className="w-12 h-12 text-primary animate-spin" />
-                <p className="text-muted-foreground text-center px-8">
-                  Starting camera...
-                </p>
+                <p className="text-xs text-muted-foreground mt-2">Keep moving!</p>
               </>
-            ) : state.error ? (
+            )}
+            {countdown !== null && (
               <>
-                <AlertCircle className="w-12 h-12 text-destructive" />
-                <p className="text-destructive text-center px-8">{state.error}</p>
-                <Button onClick={handleStartCamera} variant="outline" className="mt-2">
-                  <Camera className="w-4 h-4 mr-2" />
-                  Try Again
-                </Button>
-              </>
-            ) : (
-              <>
+                <p className="text-xs text-success mb-1">Almost done!</p>
                 <motion.div
-                  animate={{ scale: [1, 1.1, 1] }}
-                  transition={{ repeat: Infinity, duration: 2 }}
+                  key={countdown}
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="text-4xl font-display font-bold text-success"
                 >
-                  <Camera className="w-16 h-16 text-primary" />
+                  {countdown}
                 </motion.div>
-                <p className="text-foreground font-medium text-center px-8">
-                  Click to enable camera tracking
-                </p>
-                {hasLearnedPattern && (
-                  <p className="text-primary text-sm flex items-center gap-1">
-                    <Brain className="w-4 h-4" />
-                    Your movement pattern is ready!
-                  </p>
-                )}
-                <Button onClick={handleStartCamera} className="mt-2 bg-gradient-to-r from-primary to-accent">
-                  <Camera className="w-4 h-4 mr-2" />
-                  Start Camera
-                </Button>
               </>
             )}
           </div>
         )}
+
+        {/* Main camera area */}
+        <div className="relative aspect-video bg-muted/30 flex-1">
+          <video
+            ref={videoRef}
+            className={`absolute inset-0 w-full h-full object-cover ${state.isActive ? '' : 'hidden'}`}
+            autoPlay
+            muted
+            playsInline
+          />
+          <canvas
+            ref={canvasRef}
+            className={`absolute inset-0 w-full h-full object-cover pointer-events-none ${state.isActive ? '' : 'hidden'}`}
+            style={{ mixBlendMode: 'screen', opacity: 0.6 }}
+          />
+          
+          {state.isActive ? (
+            <>
+              {/* Detection overlay */}
+              <div className="absolute inset-0 pointer-events-none">
+                {/* Corner decorations */}
+                <div className={`absolute top-4 left-4 w-12 h-12 border-t-2 border-l-2 rounded-tl-lg transition-colors ${
+                  state.patternMatch ? 'border-success' : 'border-primary/50'
+                }`} />
+                <div className={`absolute top-4 right-4 w-12 h-12 border-t-2 border-r-2 rounded-tr-lg transition-colors ${
+                  state.patternMatch ? 'border-success' : 'border-primary/50'
+                }`} />
+                <div className={`absolute bottom-4 left-4 w-12 h-12 border-b-2 border-l-2 rounded-bl-lg transition-colors ${
+                  state.patternMatch ? 'border-success' : 'border-primary/50'
+                }`} />
+                <div className={`absolute bottom-4 right-4 w-12 h-12 border-b-2 border-r-2 rounded-br-lg transition-colors ${
+                  state.patternMatch ? 'border-success' : 'border-primary/50'
+                }`} />
+
+                {/* Status badge */}
+                <div className="absolute top-4 left-1/2 -translate-x-1/2">
+                  <motion.div 
+                    animate={{ scale: state.patternMatch ? [1, 1.05, 1] : 1 }}
+                    transition={{ repeat: state.patternMatch ? Infinity : 0, duration: 0.5 }}
+                    className={`px-4 py-2 rounded-full bg-background/80 backdrop-blur-sm text-sm font-medium ${statusMessage.color}`}
+                  >
+                    {statusMessage.text}
+                  </motion.div>
+                </div>
+
+                {/* Match score indicator */}
+                {hasLearnedPattern && state.motionLevel > 3 && (
+                  <div className="absolute top-14 left-1/2 -translate-x-1/2">
+                    <div className={`px-3 py-1 rounded-full backdrop-blur-sm text-xs flex items-center gap-2 ${
+                      state.patternMatch ? 'bg-success/80 text-success-foreground' : 'bg-background/60'
+                    }`}>
+                      <Sparkles className="w-3 h-3" />
+                      Match: {Math.round(state.matchScore)}%
+                    </div>
+                  </div>
+                )}
+
+                {/* Motion level bar */}
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-48">
+                  <div className="h-2 bg-background/50 rounded-full overflow-hidden backdrop-blur-sm">
+                    <motion.div
+                      className={`h-full transition-colors ${
+                        state.patternMatch 
+                          ? 'bg-success' 
+                          : 'bg-gradient-to-r from-primary via-accent to-secondary'
+                      }`}
+                      animate={{ width: `${Math.min(state.motionLevel * 3, 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Just completed overlay */}
+                <AnimatePresence>
+                  {justCompleted && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 flex flex-col items-center justify-center bg-success/30 backdrop-blur-sm"
+                    >
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', damping: 15 }}
+                        className="w-24 h-24 rounded-full bg-success flex items-center justify-center mb-4"
+                      >
+                        <Check className="w-12 h-12 text-success-foreground" />
+                      </motion.div>
+                      <motion.p
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-2xl font-display font-bold text-success"
+                      >
+                        Rep Complete! 🎉
+                      </motion.p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* All complete overlay */}
+                <AnimatePresence>
+                  {isAllComplete && !justCompleted && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="absolute inset-0 flex flex-col items-center justify-center bg-success/20 backdrop-blur-sm"
+                    >
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', damping: 15 }}
+                        className="text-6xl mb-4"
+                      >
+                        🎉
+                      </motion.div>
+                      <p className="text-2xl font-display font-bold text-success">
+                        All {dailyGoal} reps done!
+                      </p>
+                      <p className="text-success/80 mt-1">See you tomorrow!</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </>
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+              {state.isLoading ? (
+                <>
+                  <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                  <p className="text-muted-foreground text-center px-8">
+                    Starting camera...
+                  </p>
+                </>
+              ) : state.error ? (
+                <>
+                  <AlertCircle className="w-12 h-12 text-destructive" />
+                  <p className="text-destructive text-center px-8">{state.error}</p>
+                  <Button onClick={handleStartCamera} variant="outline" className="mt-2">
+                    <Camera className="w-4 h-4 mr-2" />
+                    Try Again
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <motion.div
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ repeat: Infinity, duration: 2 }}
+                  >
+                    <Camera className="w-16 h-16 text-primary" />
+                  </motion.div>
+                  <p className="text-foreground font-medium text-center px-8">
+                    Click to enable camera tracking
+                  </p>
+                  {hasLearnedPattern && (
+                    <p className="text-primary text-sm flex items-center gap-1">
+                      <Brain className="w-4 h-4" />
+                      Your movement pattern is ready!
+                    </p>
+                  )}
+                  <Button onClick={handleStartCamera} className="mt-2 bg-gradient-to-r from-primary to-accent">
+                    <Camera className="w-4 h-4 mr-2" />
+                    Start Camera
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Detection Progress */}

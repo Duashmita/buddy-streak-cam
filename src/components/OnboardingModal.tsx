@@ -376,6 +376,23 @@ export const OnboardingModal = ({ isOpen, onComplete }: OnboardingModalProps) =>
                         +
                       </button>
                     </div>
+
+                    {/* Custom time input */}
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-sm text-muted-foreground">Or enter custom:</span>
+                      <input
+                        type="number"
+                        min="5"
+                        max="3600"
+                        value={movementDuration}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 5;
+                          setMovementDuration(Math.max(5, Math.min(3600, val)));
+                        }}
+                        className="w-20 px-3 py-2 bg-muted/50 border border-border/50 rounded-lg text-center text-sm focus:ring-2 focus:ring-primary/50 focus:outline-none"
+                      />
+                      <span className="text-sm text-muted-foreground">seconds</span>
+                    </div>
                     
                     <div className="flex flex-wrap justify-center gap-2">
                       {[
