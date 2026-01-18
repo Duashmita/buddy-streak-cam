@@ -27,6 +27,32 @@ export interface HabitState {
 
 const STORAGE_KEY = 'habit-buddy-data';
 
+// Get the current "period" key based on deadline time
+// A new period starts at the user's deadline time, not midnight
+const getPeriodKey = (deadlineTime?: string) => {
+  const now = new Date();
+  
+  if (!deadlineTime) {
+    return now.toISOString().split('T')[0];
+  }
+  
+  const [deadlineHours, deadlineMinutes] = deadlineTime.split(':').map(Number);
+  const todayDeadline = new Date();
+  todayDeadline.setHours(deadlineHours, deadlineMinutes, 0, 0);
+  
+  // If current time is past today's deadline, we're in the next period
+  // Use tomorrow's date as the period key
+  if (now >= todayDeadline) {
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  }
+  
+  // Otherwise, use today's date
+  return now.toISOString().split('T')[0];
+};
+
+// Legacy function for backwards compatibility
 const getTodayKey = () => new Date().toISOString().split('T')[0];
 
 export const useHabitStore = () => {
@@ -45,7 +71,8 @@ export const useHabitStore = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const today = getTodayKey();
+        const deadlineTime = parsed.habit?.deadlineTime;
+        const periodKey = getPeriodKey(deadlineTime);
         
         // Migrate old daily records that don't have completions array
         const migratedRecords = (parsed.dailyRecords || []).map((r: any) => ({
@@ -54,11 +81,11 @@ export const useHabitStore = () => {
           completions: r.completions || (r.completedAt ? [r.completedAt] : []),
         }));
         
-        const todayRecord = migratedRecords.find((r: DailyRecord) => r.date === today);
+        const periodRecord = migratedRecords.find((r: DailyRecord) => r.date === periodKey);
         setState({
           ...parsed,
           dailyRecords: migratedRecords,
-          todayCompletedCount: todayRecord?.completedCount || 0,
+          todayCompletedCount: periodRecord?.completedCount || 0,
         });
       } catch (e) {
         console.error('Failed to parse saved habit data:', e);
@@ -88,34 +115,33 @@ export const useHabitStore = () => {
   }, []);
 
   const recordCompletion = useCallback(() => {
-    const today = getTodayKey();
-    
     setState(prev => {
       if (!prev.habit) return prev;
       
+      const periodKey = getPeriodKey(prev.habit.deadlineTime);
       const dailyGoal = prev.habit.dailyGoal;
       const currentCount = prev.todayCompletedCount;
       
-      // Already completed all for today
+      // Already completed all for this period
       if (currentCount >= dailyGoal) return prev;
 
       const newCount = currentCount + 1;
       const isGoalComplete = newCount >= dailyGoal;
 
-      // Find or create today's record
-      const existingRecord = prev.dailyRecords.find(r => r.date === today);
+      // Find or create this period's record
+      const existingRecord = prev.dailyRecords.find(r => r.date === periodKey);
       const newCompletion = new Date().toISOString();
       
       let updatedRecords: DailyRecord[];
       if (existingRecord) {
         updatedRecords = prev.dailyRecords.map(r => 
-          r.date === today 
+          r.date === periodKey 
             ? { ...r, completedCount: newCount, completions: [...(r.completions || []), newCompletion] }
             : r
         );
       } else {
         updatedRecords = [...prev.dailyRecords, {
-          date: today,
+          date: periodKey,
           completedCount: newCount,
           completions: [newCompletion],
         }];
@@ -127,18 +153,19 @@ export const useHabitStore = () => {
       let newLastDate = prev.lastCompletedDate;
 
       if (isGoalComplete) {
+        // Get yesterday's period key
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayKey = yesterday.toISOString().split('T')[0];
 
         if (prev.lastCompletedDate === yesterdayKey) {
           newStreak = prev.streak + 1;
-        } else if (prev.lastCompletedDate !== today) {
+        } else if (prev.lastCompletedDate !== periodKey) {
           newStreak = 1;
         }
 
         newLongest = Math.max(prev.longestStreak, newStreak);
-        newLastDate = today;
+        newLastDate = periodKey;
       }
 
       return {

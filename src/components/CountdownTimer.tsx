@@ -65,19 +65,25 @@ export const CountdownTimer = ({
     return () => clearInterval(interval);
   }, [deadlineTime, hasExpired, isComplete, onDeadlineExpired]);
 
-  // Reset expired state at midnight (new day)
+  // Reset expired state at deadline time (new period starts)
   useEffect(() => {
-    const checkNewDay = () => {
+    const checkNewPeriod = () => {
       const now = new Date();
-      if (now.getHours() === 0 && now.getMinutes() === 0) {
-        setHasExpired(false);
-        setShowExpiredAnimation(false);
+      const [deadlineHours, deadlineMinutes] = deadlineTime.split(':').map(Number);
+      
+      // Check if we just passed the deadline (within 1 minute)
+      if (now.getHours() === deadlineHours && now.getMinutes() === deadlineMinutes) {
+        // Only reset if we previously expired - this starts a new period
+        if (hasExpired) {
+          setHasExpired(false);
+          setShowExpiredAnimation(false);
+        }
       }
     };
     
-    const interval = setInterval(checkNewDay, 60000);
+    const interval = setInterval(checkNewPeriod, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [deadlineTime, hasExpired]);
 
   const isUrgent = timeRemaining.hours < 2 && !isComplete && !hasExpired;
   const formatNumber = (n: number) => String(n).padStart(2, '0');
@@ -121,7 +127,7 @@ export const CountdownTimer = ({
           transition={{ delay: 0.7 }}
           className="mt-4 text-sm text-destructive/70"
         >
-          The timer will reset at midnight
+          New period starts at {deadlineTime}
         </motion.div>
       </motion.div>
     );
