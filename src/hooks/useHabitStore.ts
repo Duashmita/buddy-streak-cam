@@ -39,33 +39,58 @@ export const useHabitStore = () => {
     lastCompletedDate: null,
   });
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount and check for day change
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        const todayKey = getTodayKey();
-        
-        // Migrate old daily records that don't have completions array
-        const migratedRecords = (parsed.dailyRecords || []).map((r: any) => ({
-          ...r,
-          completedCount: r.completedCount || (r.completed ? 1 : 0),
-          completions: r.completions || (r.completedAt ? [r.completedAt] : []),
-        }));
-        
-        const todayRecord = migratedRecords.find((r: DailyRecord) => r.date === todayKey);
-        setState({
-          ...parsed,
-          dailyRecords: migratedRecords,
-          todayCompletedCount: todayRecord?.completedCount || 0,
-        });
-      } catch (e) {
-        console.error('Failed to parse saved habit data:', e);
-        // Clear corrupted data
-        localStorage.removeItem(STORAGE_KEY);
+    const loadState = () => {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const todayKey = getTodayKey();
+          
+          // Migrate old daily records that don't have completions array
+          const migratedRecords = (parsed.dailyRecords || []).map((r: any) => ({
+            ...r,
+            completedCount: r.completedCount || (r.completed ? 1 : 0),
+            completions: r.completions || (r.completedAt ? [r.completedAt] : []),
+          }));
+          
+          const todayRecord = migratedRecords.find((r: DailyRecord) => r.date === todayKey);
+          
+          // Check if we need to reset streak (missed yesterday)
+          let newStreak = parsed.streak || 0;
+          if (parsed.lastCompletedDate && parsed.lastCompletedDate !== todayKey) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayKey = yesterday.toISOString().split('T')[0];
+            
+            // If last completion wasn't yesterday or today, reset streak
+            if (parsed.lastCompletedDate !== yesterdayKey) {
+              newStreak = 0;
+            }
+          }
+          
+          setState({
+            ...parsed,
+            streak: newStreak,
+            dailyRecords: migratedRecords,
+            todayCompletedCount: todayRecord?.completedCount || 0,
+          });
+        } catch (e) {
+          console.error('Failed to parse saved habit data:', e);
+          localStorage.removeItem(STORAGE_KEY);
+        }
       }
-    }
+    };
+
+    loadState();
+
+    // Check for day change every minute
+    const interval = setInterval(() => {
+      loadState();
+    }, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Save to localStorage when state changes
